@@ -48,6 +48,7 @@ class RoomStateStoreImplTest {
                 "PYTHON",
                 4,
                 hostUserId,
+                null,
                 now,
                 now
         );
@@ -176,6 +177,7 @@ class RoomStateStoreImplTest {
                 "PYTHON",
                 4,
                 hostUserId,
+                null,
                 now,
                 now
         );
@@ -205,6 +207,7 @@ class RoomStateStoreImplTest {
                 "PYTHON",
                 4,
                 hostUserId,
+                null,
                 now,
                 now
         );
@@ -216,6 +219,7 @@ class RoomStateStoreImplTest {
                 "JAVA",
                 2,
                 hostUserId,
+                null,
                 now,
                 now
         );

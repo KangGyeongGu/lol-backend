@@ -15,6 +15,14 @@ public final class RedisKeyBuilder {
         return "room:" + roomId + ":players";
     }
 
+    public static String roomKicks(UUID roomId) {
+        return "room:" + roomId + ":kicks";
+    }
+
+    public static String roomHostHistory(UUID roomId) {
+        return "room:" + roomId + ":host_history";
+    }
+
     public static String roomListVersion() {
         return "room:list:version";
     }

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.RoomStateStore;
+import com.lol.backend.state.dto.RoomHostHistoryStateDto;
+import com.lol.backend.state.dto.RoomKickStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
 import lombok.extern.slf4j.Slf4j;
@@ -60,8 +62,12 @@ public class RoomStateStoreImpl implements RoomStateStore {
     public void deleteRoom(UUID roomId) {
         String roomKey = RedisKeyBuilder.room(roomId);
         String playersKey = RedisKeyBuilder.roomPlayers(roomId);
+        String kicksKey = RedisKeyBuilder.roomKicks(roomId);
+        String hostHistoryKey = RedisKeyBuilder.roomHostHistory(roomId);
         redisTemplate.delete(roomKey);
         redisTemplate.delete(playersKey);
+        redisTemplate.delete(kicksKey);
+        redisTemplate.delete(hostHistoryKey);
         log.debug("Deleted room state: roomId={}", roomId);
     }
 
@@ -73,7 +79,8 @@ public class RoomStateStoreImpl implements RoomStateStore {
         }
 
         return keys.stream()
-                .filter(key -> !key.contains(":players") && !key.contains(":version"))
+                .filter(key -> !key.contains(":players") && !key.contains(":version")
+                        && !key.contains(":kicks") && !key.contains(":host_history"))
                 .map(key -> {
                     String json = redisTemplate.opsForValue().get(key);
                     if (json == null) return null;
@@ -188,5 +195,77 @@ public class RoomStateStoreImpl implements RoomStateStore {
             log.error("Failed to parse list version: {}", value, e);
             return 0L;
         }
+    }
+
+    @Override
+    public void addKick(RoomKickStateDto kick) {
+        String key = RedisKeyBuilder.roomKicks(kick.roomId());
+        String hashKey = kick.userId().toString();
+        try {
+            String json = objectMapper.writeValueAsString(kick);
+            redisTemplate.opsForHash().put(key, hashKey, json);
+            log.debug("Added kick to room: roomId={}, userId={}", kick.roomId(), kick.userId());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize room kick state: " + kick.userId(), e);
+        }
+    }
+
+    @Override
+    public boolean isKicked(UUID roomId, UUID userId) {
+        String key = RedisKeyBuilder.roomKicks(roomId);
+        String hashKey = userId.toString();
+        return Boolean.TRUE.equals(redisTemplate.opsForHash().hasKey(key, hashKey));
+    }
+
+    @Override
+    public List<RoomKickStateDto> getKicks(UUID roomId) {
+        String key = RedisKeyBuilder.roomKicks(roomId);
+        Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+        if (entries.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return entries.values().stream()
+                .map(obj -> {
+                    try {
+                        return objectMapper.readValue(obj.toString(), RoomKickStateDto.class);
+                    } catch (IOException e) {
+                        log.error("Failed to deserialize room kick state from roomId={}", roomId, e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void addHostHistory(RoomHostHistoryStateDto history) {
+        String key = RedisKeyBuilder.roomHostHistory(history.roomId());
+        try {
+            String json = objectMapper.writeValueAsString(history);
+            redisTemplate.opsForList().rightPush(key, json);
+            log.debug("Added host history to room: roomId={}, toUserId={}", history.roomId(), history.toUserId());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize room host history state", e);
+        }
+    }
+
+    @Override
+    public List<RoomHostHistoryStateDto> getHostHistory(UUID roomId) {
+        String key = RedisKeyBuilder.roomHostHistory(roomId);
+        List<String> entries = redisTemplate.opsForList().range(key, 0, -1);
+        if (entries == null || entries.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return entries.stream()
+                .map(json -> {
+                    try {
+                        return objectMapper.readValue(json, RoomHostHistoryStateDto.class);
+                    } catch (IOException e) {
+                        log.error("Failed to deserialize room host history state from roomId={}", roomId, e);
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }

@@ -10,6 +10,7 @@ public record RoomStateDto(
         String language,
         int maxPlayers,
         UUID hostUserId,
+        UUID activeGameId,
         Instant createdAt,
         Instant updatedAt
 ) {

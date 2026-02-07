@@ -11,7 +11,6 @@ import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.room.dto.*;
 import com.lol.backend.modules.room.entity.*;
 import com.lol.backend.modules.room.event.RoomEventPublisher;
-import com.lol.backend.modules.room.repo.*;
 import com.lol.backend.modules.user.entity.Language;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
@@ -20,6 +19,8 @@ import com.lol.backend.state.RoomStateStore;
 import com.lol.backend.state.SnapshotWriter;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
+import com.lol.backend.state.dto.RoomHostHistoryStateDto;
+import com.lol.backend.state.dto.RoomKickStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
 import org.springframework.stereotype.Service;
@@ -35,10 +36,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoomService {
 
-    private final RoomRepository roomRepository;
-    private final RoomPlayerRepository roomPlayerRepository;
-    private final RoomKickRepository roomKickRepository;
-    private final RoomHostHistoryRepository roomHostHistoryRepository;
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
     private final UserRepository userRepository;
@@ -48,7 +45,6 @@ public class RoomService {
     private final SnapshotWriter snapshotWriter;
 
     // ========== 1. getRooms ==========
-    @Transactional(readOnly = true)
     public PagedRoomListResponse getRooms(UUID currentUserId,
                                           String roomName,
                                           Language language,
@@ -90,8 +86,8 @@ public class RoomService {
                     // 플레이어가 0인 방은 제외
                     if (currentPlayers == 0) return null;
 
-                    boolean hasActiveGame = gameRepository.findByRoomId(roomState.id()).isPresent();
-                    boolean isKicked = roomKickRepository.existsByRoomIdAndUserId(roomState.id(), currentUserId);
+                    boolean hasActiveGame = roomState.activeGameId() != null;
+                    boolean isKicked = roomStateStore.isKicked(roomState.id(), currentUserId);
 
                     String status = hasActiveGame ? "IN_GAME" : "WAITING";
                     boolean joinable = !hasActiveGame
@@ -125,7 +121,6 @@ public class RoomService {
     }
 
     // ========== 2. createRoom ==========
-    @Transactional
     public RoomDetailResponse createRoom(UUID userId, CreateRoomRequest request) {
         User user = findUserOrThrow(userId);
 
@@ -134,63 +129,55 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ACTIVE_GAME_EXISTS);
         }
 
-        Room room = new Room(
-                request.roomName(),
-                request.gameType(),
-                request.language(),
-                request.maxPlayers(),
-                userId
-        );
-        roomRepository.save(room);
+        UUID roomId = UUID.randomUUID();
+        Instant now = Instant.now();
 
-        // Redis에 Room 상태 저장
+        // Redis에 Room 상태 저장 (DB 접근 없음)
         RoomStateDto roomState = new RoomStateDto(
-                room.getId(),
-                room.getRoomName(),
-                room.getGameType().name(),
-                room.getLanguage().name(),
-                room.getMaxPlayers(),
-                room.getHostUserId(),
-                room.getCreatedAt(),
-                room.getUpdatedAt()
+                roomId,
+                request.roomName(),
+                request.gameType().name(),
+                request.language().name(),
+                request.maxPlayers(),
+                userId,
+                null,
+                now,
+                now
         );
         roomStateStore.saveRoom(roomState);
 
-        // Creator joins as host (READY by default for host)
-        RoomPlayer roomPlayer = new RoomPlayer(room.getId(), user, PlayerState.READY);
-        roomPlayerRepository.save(roomPlayer);
-
-        // Redis에 RoomPlayer 상태 저장
+        // Redis에 RoomPlayer 상태 저장 (DB 접근 없음)
+        UUID playerId = UUID.randomUUID();
         RoomPlayerStateDto playerState = new RoomPlayerStateDto(
-                roomPlayer.getId(),
-                roomPlayer.getRoomId(),
-                roomPlayer.getUserId(),
-                roomPlayer.getState().name(),
-                roomPlayer.getJoinedAt(),
+                playerId,
+                roomId,
+                userId,
+                PlayerState.READY.name(),
+                now,
                 null,
                 null
         );
         roomStateStore.addPlayer(playerState);
 
-        // Host history (write-through, 이력 기록)
-        roomHostHistoryRepository.save(
-                new RoomHostHistory(room.getId(), null, userId, HostChangeReason.SYSTEM)
-        );
+        // Host history → Redis
+        roomStateStore.addHostHistory(new RoomHostHistoryStateDto(
+                roomId, null, userId, HostChangeReason.SYSTEM.name(), now
+        ));
 
         roomStateStore.incrementListVersion();
-        eventPublisher.roomCreated(room.getId());
+        long listVersion = roomStateStore.getListVersion();
+        RoomSummaryResponse summary = buildRoomSummary(roomId);
+        eventPublisher.roomListUpsert(summary, listVersion);
 
-        return buildRoomDetailResponse(room.getId());
+        return buildRoomDetailResponse(roomId);
     }
 
     // ========== 3. getRoomDetail ==========
-    @Transactional(readOnly = true)
     public RoomDetailResponse getRoomDetail(UUID roomId) {
         return buildRoomDetailResponse(roomId);
     }
 
     // ========== 4. joinRoom ==========
-    @Transactional
     public RoomDetailResponse joinRoom(UUID roomId, UUID userId) {
         User user = findUserOrThrow(userId);
 
@@ -202,8 +189,8 @@ public class RoomService {
         RoomStateDto roomState = roomStateStore.getRoom(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
 
-        // kick guard
-        if (roomKickRepository.existsByRoomIdAndUserId(roomId, userId)) {
+        // kick guard → Redis
+        if (roomStateStore.isKicked(roomId, userId)) {
             throw new BusinessException(ErrorCode.KICKED_USER);
         }
 
@@ -218,34 +205,38 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
 
-        // in-game guard
-        if (gameRepository.findByRoomId(roomId).isPresent()) {
+        // in-game guard → Redis
+        if (roomState.activeGameId() != null) {
             throw new BusinessException(ErrorCode.ACTIVE_GAME_EXISTS);
         }
 
-        RoomPlayer roomPlayer = new RoomPlayer(roomId, user, PlayerState.UNREADY);
-        roomPlayerRepository.save(roomPlayer);
-
-        // Redis에 RoomPlayer 상태 저장
+        // Redis에 RoomPlayer 상태 저장 (DB 접근 없음)
+        Instant now = Instant.now();
+        UUID playerId = UUID.randomUUID();
         RoomPlayerStateDto playerState = new RoomPlayerStateDto(
-                roomPlayer.getId(),
-                roomPlayer.getRoomId(),
-                roomPlayer.getUserId(),
-                roomPlayer.getState().name(),
-                roomPlayer.getJoinedAt(),
+                playerId,
+                roomId,
+                userId,
+                PlayerState.UNREADY.name(),
+                now,
                 null,
                 null
         );
         roomStateStore.addPlayer(playerState);
 
         roomStateStore.incrementListVersion();
-        eventPublisher.playerJoined(roomId, userId);
+        eventPublisher.playerJoined(
+                roomId,
+                userId,
+                user.getNickname(),
+                PlayerState.UNREADY.name(),
+                now.toString()
+        );
 
         return buildRoomDetailResponse(roomId);
     }
 
     // ========== 5. leaveRoom ==========
-    @Transactional
     public void leaveRoom(UUID roomId, UUID userId) {
         RoomStateDto roomState = roomStateStore.getRoom(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
@@ -253,7 +244,7 @@ public class RoomService {
         RoomPlayerStateDto playerState = roomStateStore.getPlayer(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
-        // Redis에서 플레이어 leftAt 갱신 (write-back: Redis 단일 진실)
+        // Redis에서 플레이어 leftAt 갱신
         RoomPlayerStateDto updatedPlayer = new RoomPlayerStateDto(
                 playerState.id(),
                 playerState.roomId(),
@@ -268,19 +259,16 @@ public class RoomService {
         List<RoomPlayerStateDto> remaining = getActivePlayers(roomId);
 
         if (remaining.isEmpty()) {
-            // 게임이 시작되지 않은 방만 물리 삭제
-            if (gameRepository.findByRoomId(roomId).isEmpty()) {
-                roomHostHistoryRepository.deleteAllByRoomId(roomId);
-                roomKickRepository.deleteAllByRoomId(roomId);
-                roomPlayerRepository.deleteAllByRoomId(roomId);
-                roomRepository.deleteById(roomId);
+            if (roomState.activeGameId() == null) {
+                // 게임 없는 방 해체: Redis 삭제만 (DB에 아무것도 없음)
                 roomStateStore.deleteRoom(roomId);
             } else {
-                // 게임이 시작된 경우 스냅샷 반영
+                // 게임이 시작된 방 해체: DB에 스냅샷 반영 + Redis 삭제
                 snapshotWriter.flushRoom(roomId);
             }
             roomStateStore.incrementListVersion();
-            eventPublisher.roomRemoved(roomId);
+            long listVersion = roomStateStore.getListVersion();
+            eventPublisher.roomListRemoved(roomId, listVersion, "DISBANDED");
             return;
         }
 
@@ -289,7 +277,7 @@ public class RoomService {
             RoomPlayerStateDto newHostPlayer = remaining.get(0);
             UUID newHostUserId = newHostPlayer.userId();
 
-            // Redis에 Room hostUserId 갱신 (write-back: Redis 단일 진실)
+            // Redis에 Room hostUserId 갱신
             RoomStateDto updatedRoom = new RoomStateDto(
                     roomState.id(),
                     roomState.roomName(),
@@ -297,12 +285,13 @@ public class RoomService {
                     roomState.language(),
                     roomState.maxPlayers(),
                     newHostUserId,
+                    roomState.activeGameId(),
                     roomState.createdAt(),
                     Instant.now()
             );
             roomStateStore.saveRoom(updatedRoom);
 
-            // Redis에 새 방장 상태 READY로 갱신 (write-back: Redis 단일 진실)
+            // Redis에 새 방장 상태 READY로 갱신
             RoomPlayerStateDto newHostUpdated = new RoomPlayerStateDto(
                     newHostPlayer.id(),
                     newHostPlayer.roomId(),
@@ -314,20 +303,25 @@ public class RoomService {
             );
             roomStateStore.addPlayer(newHostUpdated);
 
-            // Host history (write-through, 이력 기록)
-            roomHostHistoryRepository.save(
-                    new RoomHostHistory(roomId, userId, newHostUserId, HostChangeReason.LEAVE)
-            );
+            // Host history → Redis
+            roomStateStore.addHostHistory(new RoomHostHistoryStateDto(
+                    roomId, userId, newHostUserId, HostChangeReason.LEAVE.name(), Instant.now()
+            ));
 
-            eventPublisher.hostChanged(roomId, newHostUserId);
+            eventPublisher.hostChanged(
+                    roomId,
+                    userId,
+                    newHostUserId,
+                    "HOST_LEFT",
+                    Instant.now().toString()
+            );
         }
 
         roomStateStore.incrementListVersion();
-        eventPublisher.playerLeft(roomId, userId);
+        eventPublisher.playerLeft(roomId, userId, Instant.now().toString(), "LEAVE");
     }
 
     // ========== 6. ready ==========
-    @Transactional
     public RoomDetailResponse ready(UUID roomId, UUID userId) {
         RoomStateDto roomState = roomStateStore.getRoom(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
@@ -336,19 +330,22 @@ public class RoomService {
             throw new BusinessException(ErrorCode.INVALID_PLAYER_STATE);
         }
 
-        RoomPlayerStateDto playerState = roomStateStore.getPlayer(roomId, userId)
+        roomStateStore.getPlayer(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
-        // Redis 상태 갱신 (write-back: Redis 단일 진실)
         roomStateStore.updatePlayerState(roomId, userId, PlayerState.READY.name());
 
-        eventPublisher.playerStateChanged(roomId, userId, PlayerState.READY.name());
+        eventPublisher.playerStateChanged(
+                roomId,
+                userId,
+                PlayerState.READY.name(),
+                Instant.now().toString()
+        );
 
         return buildRoomDetailResponse(roomId);
     }
 
     // ========== 7. unready ==========
-    @Transactional
     public RoomDetailResponse unready(UUID roomId, UUID userId) {
         RoomStateDto roomState = roomStateStore.getRoom(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
@@ -357,13 +354,17 @@ public class RoomService {
             throw new BusinessException(ErrorCode.INVALID_PLAYER_STATE);
         }
 
-        RoomPlayerStateDto playerState = roomStateStore.getPlayer(roomId, userId)
+        roomStateStore.getPlayer(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
-        // Redis 상태 갱신 (write-back: Redis 단일 진실)
         roomStateStore.updatePlayerState(roomId, userId, PlayerState.UNREADY.name());
 
-        eventPublisher.playerStateChanged(roomId, userId, PlayerState.UNREADY.name());
+        eventPublisher.playerStateChanged(
+                roomId,
+                userId,
+                PlayerState.UNREADY.name(),
+                Instant.now().toString()
+        );
 
         return buildRoomDetailResponse(roomId);
     }
@@ -378,7 +379,7 @@ public class RoomService {
             throw new BusinessException(ErrorCode.NOT_HOST);
         }
 
-        if (gameRepository.findByRoomId(roomId).isPresent()) {
+        if (roomState.activeGameId() != null) {
             throw new BusinessException(ErrorCode.ACTIVE_GAME_EXISTS);
         }
 
@@ -391,6 +392,9 @@ public class RoomService {
         if (!allReady) {
             throw new BusinessException(ErrorCode.INVALID_PLAYER_STATE);
         }
+
+        // Phase 1: Room → DB flush (FK 만족)
+        snapshotWriter.persistRoom(roomId);
 
         Game game = new Game(roomId, GameType.valueOf(roomState.gameType()));
         gameRepository.save(game);
@@ -440,14 +444,29 @@ public class RoomService {
             userRepository.save(player);
         }
 
+        // Redis RoomStateDto 갱신: activeGameId 설정
+        RoomStateDto updatedRoom = new RoomStateDto(
+                roomState.id(),
+                roomState.roomName(),
+                roomState.gameType(),
+                roomState.language(),
+                roomState.maxPlayers(),
+                roomState.hostUserId(),
+                game.getId(),
+                roomState.createdAt(),
+                Instant.now()
+        );
+        roomStateStore.saveRoom(updatedRoom);
+
         roomStateStore.incrementListVersion();
+        long listVersion = roomStateStore.getListVersion();
+        eventPublisher.roomListRemoved(roomId, listVersion, "GAME_STARTED");
         eventPublisher.gameStarted(roomId, game.getId());
 
         return ActiveGameResponse.from(game);
     }
 
     // ========== 9. kickPlayer ==========
-    @Transactional
     public RoomDetailResponse kickPlayer(UUID roomId, UUID userId, UUID targetUserId) {
         RoomStateDto roomState = roomStateStore.getRoom(roomId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
@@ -456,14 +475,14 @@ public class RoomService {
             throw new BusinessException(ErrorCode.NOT_HOST);
         }
 
-        RoomPlayerStateDto targetPlayer = roomStateStore.getPlayer(roomId, targetUserId)
+        roomStateStore.getPlayer(roomId, targetUserId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
-        // Kick 기록 (write-through, 이력 기록)
-        RoomKick kick = new RoomKick(roomId, targetUserId, userId);
-        roomKickRepository.save(kick);
+        // Kick 기록 → Redis
+        roomStateStore.addKick(new RoomKickStateDto(roomId, targetUserId, userId, Instant.now()));
 
-        // Redis에서 플레이어 leftAt 갱신 (write-back: Redis 단일 진실)
+        // Redis에서 플레이어 leftAt 갱신
+        RoomPlayerStateDto targetPlayer = roomStateStore.getPlayer(roomId, targetUserId).get();
         RoomPlayerStateDto updatedPlayer = new RoomPlayerStateDto(
                 targetPlayer.id(),
                 targetPlayer.roomId(),
@@ -476,7 +495,13 @@ public class RoomService {
         roomStateStore.addPlayer(updatedPlayer);
 
         roomStateStore.incrementListVersion();
-        eventPublisher.playerKicked(roomId, targetUserId);
+        eventPublisher.playerKicked(
+                roomId,
+                targetUserId,
+                userId,
+                Instant.now().toString()
+        );
+        eventPublisher.playerLeft(roomId, targetUserId, Instant.now().toString(), "KICKED");
 
         return buildRoomDetailResponse(roomId);
     }
@@ -491,6 +516,28 @@ public class RoomService {
         return roomStateStore.getPlayers(roomId).stream()
                 .filter(p -> p.leftAt() == null)
                 .collect(Collectors.toList());
+    }
+
+    private RoomSummaryResponse buildRoomSummary(UUID roomId) {
+        RoomStateDto roomState = roomStateStore.getRoom(roomId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROOM_NOT_FOUND));
+
+        int currentPlayers = getActivePlayers(roomId).size();
+        boolean hasActiveGame = roomState.activeGameId() != null;
+        String status = hasActiveGame ? "IN_GAME" : "WAITING";
+        boolean joinable = !hasActiveGame && currentPlayers < roomState.maxPlayers();
+
+        return new RoomSummaryResponse(
+                roomState.id().toString(),
+                roomState.roomName(),
+                GameType.valueOf(roomState.gameType()),
+                Language.valueOf(roomState.language()),
+                roomState.maxPlayers(),
+                currentPlayers,
+                status,
+                joinable,
+                roomState.updatedAt()
+        );
     }
 
     private RoomDetailResponse buildRoomDetailResponse(UUID roomId) {

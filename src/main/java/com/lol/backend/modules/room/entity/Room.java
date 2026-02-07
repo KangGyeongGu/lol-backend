@@ -55,11 +55,29 @@ public class Room {
         this.hostUserId = hostUserId;
     }
 
+    public static Room restore(UUID id, String roomName, GameType gameType,
+                                com.lol.backend.modules.user.entity.Language language,
+                                int maxPlayers, UUID hostUserId,
+                                Instant createdAt, Instant updatedAt) {
+        Room room = new Room();
+        room.id = id;
+        room.roomName = roomName;
+        room.gameType = gameType;
+        room.language = language;
+        room.maxPlayers = maxPlayers;
+        room.hostUserId = hostUserId;
+        room.createdAt = createdAt;
+        room.updatedAt = updatedAt;
+        return room;
+    }
+
     @PrePersist
     protected void onCreate() {
-        Instant now = Instant.now();
-        this.createdAt = now;
-        this.updatedAt = now;
+        if (this.createdAt == null) {
+            Instant now = Instant.now();
+            this.createdAt = now;
+            this.updatedAt = now;
+        }
     }
 
     @PreUpdate

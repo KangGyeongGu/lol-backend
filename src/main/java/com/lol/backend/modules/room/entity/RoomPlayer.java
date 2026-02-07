@@ -59,9 +59,25 @@ public class RoomPlayer {
         this.state = state;
     }
 
+    public static RoomPlayer restore(UUID id, UUID roomId, UUID userId,
+                                      PlayerState state, Instant joinedAt,
+                                      Instant leftAt, Instant disconnectedAt) {
+        RoomPlayer rp = new RoomPlayer();
+        rp.id = id;
+        rp.roomId = roomId;
+        rp.userId = userId;
+        rp.state = state;
+        rp.joinedAt = joinedAt;
+        rp.leftAt = leftAt;
+        rp.disconnectedAt = disconnectedAt;
+        return rp;
+    }
+
     @PrePersist
     protected void onCreate() {
-        this.joinedAt = Instant.now();
+        if (this.joinedAt == null) {
+            this.joinedAt = Instant.now();
+        }
     }
 
     public void leave() {

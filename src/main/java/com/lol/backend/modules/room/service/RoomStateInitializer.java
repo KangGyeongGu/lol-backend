@@ -14,6 +14,9 @@ import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
+
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -50,6 +53,10 @@ public class RoomStateInitializer implements ApplicationRunner {
                 continue;
             }
 
+            // 해당 room에 active game이 있는지 확인
+            Optional<Game> activeGame = gameRepository.findByRoomId(room.getId());
+            UUID activeGameId = activeGame.map(Game::getId).orElse(null);
+
             RoomStateDto roomDto = new RoomStateDto(
                     room.getId(),
                     room.getRoomName(),
@@ -57,6 +64,7 @@ public class RoomStateInitializer implements ApplicationRunner {
                     room.getLanguage().name(),
                     room.getMaxPlayers(),
                     room.getHostUserId(),
+                    activeGameId,
                     room.getCreatedAt(),
                     room.getUpdatedAt()
             );

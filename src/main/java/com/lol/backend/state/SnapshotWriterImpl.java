@@ -4,24 +4,33 @@ import com.lol.backend.modules.game.entity.Game;
 import com.lol.backend.modules.game.entity.GamePlayer;
 import com.lol.backend.modules.game.entity.GamePlayerState;
 import com.lol.backend.modules.game.entity.GameStage;
+import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.entity.MatchResult;
 import com.lol.backend.modules.game.repo.GamePlayerRepository;
 import com.lol.backend.modules.game.repo.GameRepository;
+import com.lol.backend.modules.room.entity.HostChangeReason;
 import com.lol.backend.modules.room.entity.Room;
+import com.lol.backend.modules.room.entity.RoomHostHistory;
+import com.lol.backend.modules.room.entity.RoomKick;
 import com.lol.backend.modules.room.entity.RoomPlayer;
 import com.lol.backend.modules.room.entity.PlayerState;
+import com.lol.backend.modules.room.repo.RoomHostHistoryRepository;
+import com.lol.backend.modules.room.repo.RoomKickRepository;
 import com.lol.backend.modules.room.repo.RoomPlayerRepository;
 import com.lol.backend.modules.room.repo.RoomRepository;
 import com.lol.backend.modules.shop.entity.GameBan;
 import com.lol.backend.modules.shop.entity.GamePick;
 import com.lol.backend.modules.shop.repo.GameBanRepository;
 import com.lol.backend.modules.shop.repo.GamePickRepository;
+import com.lol.backend.modules.user.entity.Language;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
+import com.lol.backend.state.dto.RoomHostHistoryStateDto;
+import com.lol.backend.state.dto.RoomKickStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +51,8 @@ public class SnapshotWriterImpl implements SnapshotWriter {
     private final BanPickStateStore banPickStateStore;
     private final RoomRepository roomRepository;
     private final RoomPlayerRepository roomPlayerRepository;
+    private final RoomKickRepository roomKickRepository;
+    private final RoomHostHistoryRepository roomHostHistoryRepository;
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
     private final GameBanRepository gameBanRepository;
@@ -55,6 +66,8 @@ public class SnapshotWriterImpl implements SnapshotWriter {
             BanPickStateStore banPickStateStore,
             RoomRepository roomRepository,
             RoomPlayerRepository roomPlayerRepository,
+            RoomKickRepository roomKickRepository,
+            RoomHostHistoryRepository roomHostHistoryRepository,
             GameRepository gameRepository,
             GamePlayerRepository gamePlayerRepository,
             GameBanRepository gameBanRepository,
@@ -67,6 +80,8 @@ public class SnapshotWriterImpl implements SnapshotWriter {
         this.banPickStateStore = banPickStateStore;
         this.roomRepository = roomRepository;
         this.roomPlayerRepository = roomPlayerRepository;
+        this.roomKickRepository = roomKickRepository;
+        this.roomHostHistoryRepository = roomHostHistoryRepository;
         this.gameRepository = gameRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.gameBanRepository = gameBanRepository;
@@ -77,51 +92,96 @@ public class SnapshotWriterImpl implements SnapshotWriter {
 
     @Override
     @Transactional
-    public void flushRoom(UUID roomId) {
-        log.info("Flushing room snapshot to DB: roomId={}", roomId);
+    public void persistRoom(UUID roomId) {
+        log.info("Persisting room snapshot to DB: roomId={}", roomId);
 
-        // Redis에서 Room 상태 조회
         RoomStateDto roomState = roomStateStore.getRoom(roomId).orElse(null);
         if (roomState == null) {
             log.warn("Room state not found in Redis: roomId={}", roomId);
             return;
         }
 
-        // DB에서 Room 조회
+        // Room upsert
         Room dbRoom = roomRepository.findById(roomId).orElse(null);
-        if (dbRoom == null) {
-            log.warn("Room not found in DB: roomId={}", roomId);
-            return;
+        if (dbRoom != null) {
+            dbRoom.setRoomName(roomState.roomName());
+            dbRoom.setHostUserId(roomState.hostUserId());
+            roomRepository.save(dbRoom);
+        } else {
+            dbRoom = Room.restore(
+                    roomState.id(),
+                    roomState.roomName(),
+                    GameType.valueOf(roomState.gameType()),
+                    Language.valueOf(roomState.language()),
+                    roomState.maxPlayers(),
+                    roomState.hostUserId(),
+                    roomState.createdAt(),
+                    roomState.updatedAt()
+            );
+            roomRepository.save(dbRoom);
         }
-
-        // Room 필드 동기화
-        dbRoom.setRoomName(roomState.roomName());
-        dbRoom.setHostUserId(roomState.hostUserId());
-        roomRepository.save(dbRoom);
         log.debug("Room saved to DB: roomId={}", roomId);
 
-        // Redis에서 RoomPlayer 목록 조회
+        // RoomPlayer upsert
         List<RoomPlayerStateDto> playerStates = roomStateStore.getPlayers(roomId);
         for (RoomPlayerStateDto playerState : playerStates) {
             RoomPlayer dbPlayer = roomPlayerRepository.findById(playerState.id()).orElse(null);
-            if (dbPlayer == null) {
-                log.warn("RoomPlayer not found in DB: id={}", playerState.id());
-                continue;
+            if (dbPlayer != null) {
+                dbPlayer.setState(PlayerState.valueOf(playerState.state()));
+                if (playerState.leftAt() != null) {
+                    dbPlayer.setLeftAt(playerState.leftAt());
+                }
+                if (playerState.disconnectedAt() != null) {
+                    dbPlayer.setDisconnectedAt(playerState.disconnectedAt());
+                }
+                roomPlayerRepository.save(dbPlayer);
+            } else {
+                dbPlayer = RoomPlayer.restore(
+                        playerState.id(),
+                        playerState.roomId(),
+                        playerState.userId(),
+                        PlayerState.valueOf(playerState.state()),
+                        playerState.joinedAt(),
+                        playerState.leftAt(),
+                        playerState.disconnectedAt()
+                );
+                roomPlayerRepository.save(dbPlayer);
             }
-
-            // RoomPlayer 필드 동기화
-            dbPlayer.setState(PlayerState.valueOf(playerState.state()));
-            if (playerState.leftAt() != null) {
-                dbPlayer.setLeftAt(playerState.leftAt());
-            }
-            if (playerState.disconnectedAt() != null) {
-                dbPlayer.setDisconnectedAt(playerState.disconnectedAt());
-            }
-            roomPlayerRepository.save(dbPlayer);
             log.debug("RoomPlayer saved to DB: id={}", playerState.id());
         }
 
-        log.info("Room snapshot flushed successfully: roomId={}", roomId);
+        // Kicks flush
+        List<RoomKickStateDto> kicks = roomStateStore.getKicks(roomId);
+        for (RoomKickStateDto kick : kicks) {
+            if (!roomKickRepository.existsByRoomIdAndUserId(kick.roomId(), kick.userId())) {
+                RoomKick roomKick = new RoomKick(kick.roomId(), kick.userId(), kick.kickedByUserId());
+                roomKickRepository.save(roomKick);
+                log.debug("RoomKick saved to DB: roomId={}, userId={}", kick.roomId(), kick.userId());
+            }
+        }
+
+        // HostHistory flush
+        List<RoomHostHistoryStateDto> histories = roomStateStore.getHostHistory(roomId);
+        for (RoomHostHistoryStateDto history : histories) {
+            RoomHostHistory roomHostHistory = new RoomHostHistory(
+                    history.roomId(),
+                    history.fromUserId(),
+                    history.toUserId(),
+                    HostChangeReason.valueOf(history.reason())
+            );
+            roomHostHistoryRepository.save(roomHostHistory);
+            log.debug("RoomHostHistory saved to DB: roomId={}, toUserId={}", history.roomId(), history.toUserId());
+        }
+
+        log.info("Room snapshot persisted successfully: roomId={}", roomId);
+    }
+
+    @Override
+    @Transactional
+    public void flushRoom(UUID roomId) {
+        persistRoom(roomId);
+        roomStateStore.deleteRoom(roomId);
+        log.info("Room snapshot flushed and Redis cleared: roomId={}", roomId);
     }
 
     @Override
