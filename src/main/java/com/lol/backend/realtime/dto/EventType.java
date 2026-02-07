@@ -1,0 +1,25 @@
+package com.lol.backend.realtime.dto;
+
+/**
+ * 서버 → 클라이언트 이벤트 타입.
+ * EVENTS.md 1.1 EventType 목록 기준.
+ */
+public enum EventType {
+    ERROR,
+    CHAT_MESSAGE,
+    ROOM_LIST_UPSERT,
+    ROOM_LIST_REMOVED,
+    ROOM_PLAYER_JOINED,
+    ROOM_PLAYER_LEFT,
+    ROOM_PLAYER_STATE_CHANGED,
+    ROOM_HOST_CHANGED,
+    ROOM_KICKED,
+    GAME_STAGE_CHANGED,
+    GAME_FINISHED,
+    TYPING_STATUS_CHANGED,
+    ITEM_EFFECT_APPLIED,
+    SPELL_EFFECT_APPLIED,
+    ITEM_EFFECT_BLOCKED,
+    EFFECT_REMOVED,
+    INVENTORY_SYNC
+}
