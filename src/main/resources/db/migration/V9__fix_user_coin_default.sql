@@ -1,2 +1,0 @@
--- SSOT ECONOMY.md 1.1: 신규 가입 시 초기 코인 1000 지급
-ALTER TABLE users ALTER COLUMN coin SET DEFAULT 1000;
