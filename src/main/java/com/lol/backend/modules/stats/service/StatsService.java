@@ -13,8 +13,7 @@ import com.lol.backend.modules.stats.dto.ListOfPlayerRankingsResponse;
 import com.lol.backend.modules.stats.dto.PlayerRankingResponse;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import com.lol.backend.state.RankingStateStore;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,38 +32,53 @@ public class StatsService {
     private final AlgorithmRepository algorithmRepository;
     private final GameBanRepository gameBanRepository;
     private final GamePickRepository gamePickRepository;
+    private final RankingStateStore rankingStateStore;
 
     public StatsService(UserRepository userRepository,
                         GameRepository gameRepository,
                         AlgorithmRepository algorithmRepository,
                         GameBanRepository gameBanRepository,
-                        GamePickRepository gamePickRepository) {
+                        GamePickRepository gamePickRepository,
+                        RankingStateStore rankingStateStore) {
         this.userRepository = userRepository;
         this.gameRepository = gameRepository;
         this.algorithmRepository = algorithmRepository;
         this.gameBanRepository = gameBanRepository;
         this.gamePickRepository = gamePickRepository;
+        this.rankingStateStore = rankingStateStore;
     }
 
     /**
      * 실시간 플레이어 랭킹 조회.
-     * 상위 100명의 플레이어를 점수 기준 내림차순으로 반환한다.
+     * Redis Sorted Set에서 상위 100명의 플레이어를 점수 기준 내림차순으로 반환한다.
      */
     @Transactional(readOnly = true)
     public ListOfPlayerRankingsResponse getPlayerRankings() {
-        PageRequest pageRequest = PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "score"));
-        List<User> topUsers = userRepository.findAll(pageRequest).getContent();
+        // Redis에서 상위 100명의 userId 조회
+        List<UUID> topUserIds = rankingStateStore.getTopPlayers(100);
+        if (topUserIds.isEmpty()) {
+            return ListOfPlayerRankingsResponse.of(List.of());
+        }
 
+        // DB에서 사용자 상세 정보 조회 (bulk query)
+        List<User> topUsers = userRepository.findAllById(topUserIds);
+        Map<UUID, User> userMap = topUsers.stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
+        // Redis 순서대로 랭킹 리스트 생성
         List<PlayerRankingResponse> rankings = new ArrayList<>();
-        for (int i = 0; i < topUsers.size(); i++) {
-            User user = topUsers.get(i);
-            rankings.add(PlayerRankingResponse.of(
-                    i + 1,
-                    user.getId().toString(),
-                    user.getNickname(),
-                    user.getScore(),
-                    user.getTier()
-            ));
+        for (int i = 0; i < topUserIds.size(); i++) {
+            UUID userId = topUserIds.get(i);
+            User user = userMap.get(userId);
+            if (user != null) {
+                rankings.add(PlayerRankingResponse.of(
+                        i + 1,
+                        user.getId().toString(),
+                        user.getNickname(),
+                        user.getScore(),
+                        user.getTier()
+                ));
+            }
         }
 
         return ListOfPlayerRankingsResponse.of(rankings);

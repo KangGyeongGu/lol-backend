@@ -109,4 +109,16 @@ public class User {
     public void setActiveGameId(UUID activeGameId) {
         this.activeGameId = activeGameId;
     }
+
+    public void setScore(int score) {
+        this.score = score;
+    }
+
+    public void setCoin(int coin) {
+        this.coin = coin;
+    }
+
+    public void setExp(double exp) {
+        this.exp = exp;
+    }
 }

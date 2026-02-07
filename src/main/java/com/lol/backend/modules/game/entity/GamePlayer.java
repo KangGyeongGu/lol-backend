@@ -90,4 +90,17 @@ public class GamePlayer {
     public Instant getJoinedAt() { return joinedAt; }
     public Instant getLeftAt() { return leftAt; }
     public Instant getDisconnectedAt() { return disconnectedAt; }
+
+    // Setters
+    public void setState(GamePlayerState state) { this.state = state; }
+    public void setScoreAfter(Integer scoreAfter) { this.scoreAfter = scoreAfter; }
+    public void setScoreDelta(Integer scoreDelta) { this.scoreDelta = scoreDelta; }
+    public void setFinalScoreValue(Integer finalScoreValue) { this.finalScoreValue = finalScoreValue; }
+    public void setRankInGame(Integer rankInGame) { this.rankInGame = rankInGame; }
+    public void setSolved(Boolean solved) { this.solved = solved; }
+    public void setResult(MatchResult result) { this.result = result; }
+    public void setCoinDelta(Integer coinDelta) { this.coinDelta = coinDelta; }
+    public void setExpDelta(Double expDelta) { this.expDelta = expDelta; }
+    public void setLeftAt(Instant leftAt) { this.leftAt = leftAt; }
+    public void setDisconnectedAt(Instant disconnectedAt) { this.disconnectedAt = disconnectedAt; }
 }

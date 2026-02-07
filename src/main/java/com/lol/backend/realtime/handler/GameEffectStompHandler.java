@@ -19,6 +19,8 @@ import com.lol.backend.modules.shop.repo.SpellUsageRepository;
 import com.lol.backend.modules.shop.service.GameInventoryService;
 import com.lol.backend.realtime.dto.*;
 import com.lol.backend.realtime.support.EventPublisher;
+import com.lol.backend.state.EphemeralStateStore;
+import com.lol.backend.state.dto.ItemEffectActiveDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.Principal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -49,6 +52,7 @@ public class GameEffectStompHandler {
     private final GameSpellPurchaseRepository gameSpellPurchaseRepository;
     private final GameInventoryService gameInventoryService;
     private final EventPublisher eventPublisher;
+    private final EphemeralStateStore ephemeralStateStore;
 
     public GameEffectStompHandler(
             GameRepository gameRepository,
@@ -59,7 +63,8 @@ public class GameEffectStompHandler {
             SpellUsageRepository spellUsageRepository,
             GameSpellPurchaseRepository gameSpellPurchaseRepository,
             GameInventoryService gameInventoryService,
-            EventPublisher eventPublisher) {
+            EventPublisher eventPublisher,
+            EphemeralStateStore ephemeralStateStore) {
         this.gameRepository = gameRepository;
         this.gamePlayerRepository = gamePlayerRepository;
         this.itemRepository = itemRepository;
@@ -69,6 +74,7 @@ public class GameEffectStompHandler {
         this.gameSpellPurchaseRepository = gameSpellPurchaseRepository;
         this.gameInventoryService = gameInventoryService;
         this.eventPublisher = eventPublisher;
+        this.ephemeralStateStore = ephemeralStateStore;
     }
 
     /**
@@ -178,8 +184,10 @@ public class GameEffectStompHandler {
         // 9. SPELL_EFFECT_APPLIED 이벤트 broadcast (SSOT EVENTS.md 7.2)
         Instant spellStartedAt = usage.getUsedAt() != null ? usage.getUsedAt() : Instant.now();
         Instant spellExpiresAt = spellStartedAt.plusSeconds(spell.getDurationSec());
+        String effectId = usage.getId().toString();
+
         Map<String, Object> effectData = Map.of(
-                "effectId", usage.getId().toString(),
+                "effectId", effectId,
                 "gameId", gameUuid.toString(),
                 "spellId", spellId.toString(),
                 "userId", userId.toString(),
@@ -188,6 +196,20 @@ public class GameEffectStompHandler {
                 "expiresAt", spellExpiresAt.toString()
         );
         eventPublisher.broadcast("/topic/games/" + gameUuid, EventType.SPELL_EFFECT_APPLIED, effectData);
+
+        // Redis에 ITEM_EFFECT_ACTIVE 저장 (Spell도 동일한 구조로 저장, itemId에 spellId 사용)
+        ItemEffectActiveDto effectDto = new ItemEffectActiveDto(
+                gameUuid,
+                userId,
+                spellId, // spellId를 itemId 필드에 저장 (ephemeral 상태이므로 구조 공유)
+                effectId,
+                spellStartedAt,
+                spellExpiresAt
+        );
+        ephemeralStateStore.saveEffect(effectDto, Duration.ofSeconds(spell.getDurationSec()));
+
+        log.debug("Saved SPELL_EFFECT_ACTIVE to Redis: gameId={}, effectId={}, userId={}, spellId={}, durationSec={}",
+                gameUuid, effectId, userId, spellId, spell.getDurationSec());
 
         // 10. 정화(cleanse) 스펠인지 확인 → EFFECT_REMOVED (SSOT EVENTS.md 7.4)
         if ("정화".equals(spell.getName())) {
@@ -253,14 +275,16 @@ public class GameEffectStompHandler {
     }
 
     /**
-     * ITEM_EFFECT_APPLIED 이벤트 broadcast.
+     * ITEM_EFFECT_APPLIED 이벤트 broadcast + Redis 저장.
      */
     private void broadcastItemEffectApplied(UUID gameId, UUID fromUserId, UUID toUserId, ItemUsage usage, Item item) {
         // SSOT EVENTS.md 7.1
         Instant startedAt = usage.getUsedAt() != null ? usage.getUsedAt() : Instant.now();
         Instant expiresAt = startedAt.plusSeconds(item.getDurationSec());
+        String effectId = usage.getId().toString();
+
         Map<String, Object> data = Map.of(
-                "effectId", usage.getId().toString(),
+                "effectId", effectId,
                 "gameId", gameId.toString(),
                 "itemId", item.getId().toString(),
                 "fromUserId", fromUserId.toString(),
@@ -270,6 +294,20 @@ public class GameEffectStompHandler {
                 "expiresAt", expiresAt.toString()
         );
         eventPublisher.broadcast("/topic/games/" + gameId, EventType.ITEM_EFFECT_APPLIED, data);
+
+        // Redis에 ITEM_EFFECT_ACTIVE 저장 (TTL = durationSec)
+        ItemEffectActiveDto effectDto = new ItemEffectActiveDto(
+                gameId,
+                toUserId,
+                item.getId(),
+                effectId,
+                startedAt,
+                expiresAt
+        );
+        ephemeralStateStore.saveEffect(effectDto, Duration.ofSeconds(item.getDurationSec()));
+
+        log.debug("Saved ITEM_EFFECT_ACTIVE to Redis: gameId={}, effectId={}, toUserId={}, itemId={}, durationSec={}",
+                gameId, effectId, toUserId, item.getId(), item.getDurationSec());
     }
 
     /**

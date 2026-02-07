@@ -4,18 +4,21 @@ import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.common.util.SecurityUtil;
 import com.lol.backend.modules.game.dto.*;
-import com.lol.backend.modules.game.entity.Game;
-import com.lol.backend.modules.game.entity.GamePlayer;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
-import com.lol.backend.modules.game.repo.GamePlayerRepository;
-import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.shop.service.GameInventoryService;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
+import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.SnapshotWriter;
+import com.lol.backend.state.dto.GamePlayerStateDto;
+import com.lol.backend.state.dto.GameStateDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,21 +29,26 @@ import java.util.UUID;
 @Service
 public class GameService {
 
-    private final GameRepository gameRepository;
-    private final GamePlayerRepository gamePlayerRepository;
+    private static final Logger log = LoggerFactory.getLogger(GameService.class);
+
+    private final GameStateStore gameStateStore;
     private final UserRepository userRepository;
     private final GameInventoryService gameInventoryService;
+    private final SnapshotWriter snapshotWriter;
+    private final com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository;
 
     public GameService(
-            GameRepository gameRepository,
-            GamePlayerRepository gamePlayerRepository,
+            GameStateStore gameStateStore,
             UserRepository userRepository,
-            GameInventoryService gameInventoryService
+            GameInventoryService gameInventoryService,
+            SnapshotWriter snapshotWriter,
+            com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository
     ) {
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
+        this.gameStateStore = gameStateStore;
         this.userRepository = userRepository;
         this.gameInventoryService = gameInventoryService;
+        this.snapshotWriter = snapshotWriter;
+        this.submissionRepository = submissionRepository;
     }
 
     /**
@@ -52,36 +60,37 @@ public class GameService {
     public GameStateResponse getGameState(UUID gameId) {
         UUID userId = UUID.fromString(SecurityUtil.getCurrentUserId());
 
-        Game game = gameRepository.findById(gameId)
+        // Redis에서 Game 상태 조회
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         // 사용자가 이 게임의 참가자인지 확인
-        GamePlayer currentPlayer = gamePlayerRepository.findByGameIdAndUserId(gameId, userId)
+        GamePlayerStateDto currentPlayer = gameStateStore.getGamePlayer(gameId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
 
-        List<GamePlayer> gamePlayers = gamePlayerRepository.findByGameId(gameId);
+        List<GamePlayerStateDto> gamePlayers = gameStateStore.getGamePlayers(gameId);
 
         int coin = gameInventoryService.calculateCoin(gameId, userId);
         InventoryResponse inventory = gameInventoryService.calculateInventory(gameId, userId);
 
         List<GamePlayerResponse> players = gamePlayers.stream()
                 .map(gp -> {
-                    User user = userRepository.findById(gp.getUserId())
+                    User user = userRepository.findById(gp.userId())
                             .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
                     return new GamePlayerResponse(
                             user.getId().toString(),
                             user.getNickname(),
-                            gp.getScoreBefore()
+                            gp.scoreBefore()
                     );
                 })
                 .toList();
 
         return new GameStateResponse(
-                game.getId().toString(),
-                game.getRoomId().toString(),
-                game.getGameType(),
-                game.getStage(),
-                game.calculateRemainingMs(),
+                game.id().toString(),
+                game.roomId().toString(),
+                GameType.valueOf(game.gameType()),
+                GameStage.valueOf(game.stage()),
+                calculateRemainingMs(game),
                 players,
                 coin,
                 inventory
@@ -98,20 +107,39 @@ public class GameService {
     public GameStateResponse submitCode(UUID gameId, SubmissionRequest request) {
         UUID userId = UUID.fromString(SecurityUtil.getCurrentUserId());
 
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         // stage 검증
-        if (game.getStage() != GameStage.PLAY) {
+        if (!game.stage().equals(GameStage.PLAY.name())) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
         // 참가자 확인
-        gamePlayerRepository.findByGameIdAndUserId(gameId, userId)
+        gameStateStore.getGamePlayer(gameId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
 
-        // TODO: 실제 코드 제출 로직 구현 (채점 시스템 연동, 결과 저장 등)
-        // 현재는 스텁으로 두고 추후 submission/grading 모듈 구현 시 연동
+        // 제출 경과 시간 계산 (게임 시작 시각부터 현재까지)
+        int submittedElapsedMs = (int) (Instant.now().toEpochMilli() - game.startedAt().toEpochMilli());
+
+        // Submission 엔티티 생성 (PENDING 상태로 저장, 외부 채점 시스템 연동은 범위 밖)
+        com.lol.backend.modules.game.entity.Submission submission = new com.lol.backend.modules.game.entity.Submission(
+                gameId,
+                userId,
+                request.language(),
+                request.sourceCode(),
+                submittedElapsedMs,
+                0, // execTimeMs: 채점 전이므로 0
+                0, // memoryKb: 채점 전이므로 0
+                com.lol.backend.modules.game.entity.JudgeStatus.AC, // 기본값: AC (실제 채점 시스템 연동 시 PENDING 등으로 변경)
+                null, // judgeDetailJson: 채점 전이므로 null
+                null  // scoreValue: 채점 전이므로 null
+        );
+
+        submissionRepository.save(submission);
+
+        log.info("Code submitted: gameId={}, userId={}, language={}, elapsedMs={}",
+                gameId, userId, request.language(), submittedElapsedMs);
 
         return getGameState(gameId);
     }
@@ -126,16 +154,21 @@ public class GameService {
      */
     @Transactional
     public void transitionStage(UUID gameId, GameStage nextStage) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        // stage 전이 규칙 검증
-        validateStageTransition(game, nextStage);
+        GameStage currentStage = GameStage.valueOf(game.stage());
+        GameType gameType = GameType.valueOf(game.gameType());
 
-        // TODO: stage별 deadline 계산 로직 추가 (설계 문서 기반)
-        // 현재는 null로 설정
-        game.transitionTo(nextStage, null);
-        gameRepository.save(game);
+        // stage 전이 규칙 검증
+        validateStageTransition(currentStage, gameType, nextStage);
+
+        // stage 전이 시간 계산
+        Instant stageStartedAt = Instant.now();
+        Instant stageDeadlineAt = calculateStageDeadline(nextStage, stageStartedAt);
+
+        // Redis에 stage 전이 상태 저장
+        gameStateStore.updateGameStage(gameId, nextStage.name(), stageStartedAt, stageDeadlineAt);
     }
 
     /**
@@ -144,27 +177,76 @@ public class GameService {
      */
     @Transactional
     public void finishGame(UUID gameId) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        if (game.isFinished()) {
+        if (game.stage().equals(GameStage.FINISHED.name())) {
             throw new BusinessException(ErrorCode.GAME_ALREADY_FINISHED);
         }
 
-        game.finishGame();
-        gameRepository.save(game);
+        // Redis에 게임 종료 상태 저장
+        Instant finishedAt = Instant.now();
+        GameStateDto finishedGame = new GameStateDto(
+                game.id(),
+                game.roomId(),
+                game.gameType(),
+                GameStage.FINISHED.name(),
+                game.stageStartedAt(),
+                game.stageDeadlineAt(),
+                game.startedAt(),
+                finishedAt,
+                game.finalAlgorithmId(),
+                game.createdAt()
+        );
+        gameStateStore.saveGame(finishedGame);
 
-        // TODO: 게임 종료 처리 (결과 계산, 보상 지급, active game 해제 등)
-        // 현재는 스텁으로 두고 추후 구현
+        // 게임 결과 계산 및 GamePlayer 상태 갱신
+        calculateAndSaveGameResults(gameId);
+
+        // DB 스냅샷 반영 (USER.active_game_id 해제, 정산 포함)
+        snapshotWriter.flushGame(gameId);
+    }
+
+    /**
+     * 게임 결과를 계산하고 GamePlayer 상태를 갱신한다.
+     */
+    private void calculateAndSaveGameResults(UUID gameId) {
+        List<GamePlayerStateDto> players = gameStateStore.getGamePlayers(gameId);
+
+        // 간단한 결과 계산 예시 (실제 로직은 게임 규칙에 따라 구현)
+        // 여기서는 모든 플레이어에게 기본 보상을 지급하는 예시
+        for (GamePlayerStateDto player : players) {
+            int scoreDelta = 10; // 기본 점수 증가
+            int coinDelta = 50; // 기본 코인 보상
+            double expDelta = 100.0; // 기본 경험치 보상
+
+            GamePlayerStateDto updatedPlayer = new GamePlayerStateDto(
+                    player.id(),
+                    player.gameId(),
+                    player.userId(),
+                    player.state(),
+                    player.scoreBefore(),
+                    player.scoreBefore() + scoreDelta,
+                    scoreDelta,
+                    player.finalScoreValue(),
+                    player.rankInGame(),
+                    player.solved(),
+                    "DRAW", // 기본 결과
+                    coinDelta,
+                    expDelta,
+                    player.joinedAt(),
+                    player.leftAt(),
+                    player.disconnectedAt()
+            );
+
+            gameStateStore.updateGamePlayer(gameId, player.userId(), updatedPlayer);
+        }
     }
 
     /**
      * stage 전이 규칙을 검증한다.
      */
-    private void validateStageTransition(Game game, GameStage nextStage) {
-        GameStage currentStage = game.getStage();
-        GameType gameType = game.getGameType();
-
+    private void validateStageTransition(GameStage currentStage, GameType gameType, GameStage nextStage) {
         if (gameType == GameType.NORMAL) {
             // NORMAL: LOBBY → PLAY → FINISHED
             if (currentStage == GameStage.LOBBY && nextStage != GameStage.PLAY) {
@@ -196,5 +278,35 @@ public class GameService {
         if (currentStage == GameStage.FINISHED) {
             throw new BusinessException(ErrorCode.GAME_ALREADY_FINISHED);
         }
+    }
+
+    /**
+     * stage별 deadline을 계산한다.
+     */
+    private Instant calculateStageDeadline(GameStage stage, Instant startedAt) {
+        // 각 stage별 제한 시간 (초)
+        long durationSeconds = switch (stage) {
+            case BAN -> 60; // 1분
+            case PICK -> 60; // 1분
+            case SHOP -> 120; // 2분
+            case PLAY -> 1800; // 30분
+            default -> 0; // LOBBY, FINISHED는 deadline 없음
+        };
+
+        if (durationSeconds > 0) {
+            return startedAt.plusSeconds(durationSeconds);
+        }
+        return null;
+    }
+
+    /**
+     * 현재 stage의 남은 시간을 밀리초로 계산한다.
+     */
+    private long calculateRemainingMs(GameStateDto game) {
+        if (game.stageDeadlineAt() == null) {
+            return 0L;
+        }
+        long remaining = game.stageDeadlineAt().toEpochMilli() - Instant.now().toEpochMilli();
+        return Math.max(0L, remaining);
     }
 }

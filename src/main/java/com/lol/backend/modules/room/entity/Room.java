@@ -71,6 +71,10 @@ public class Room {
     public Instant getUpdatedAt() { return updatedAt; }
 
     // Setters for mutable fields
+    public void setRoomName(String roomName) {
+        this.roomName = roomName;
+    }
+
     public void setHostUserId(UUID hostUserId) {
         this.hostUserId = hostUserId;
     }

@@ -2,11 +2,7 @@ package com.lol.backend.modules.shop.service;
 
 import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
-import com.lol.backend.modules.game.entity.Game;
-import com.lol.backend.modules.game.entity.GamePlayer;
 import com.lol.backend.modules.game.entity.GameStage;
-import com.lol.backend.modules.game.repo.GamePlayerRepository;
-import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.game.dto.GameStateResponse;
 import com.lol.backend.modules.shop.dto.ShopItemRequest;
 import com.lol.backend.modules.shop.dto.ShopSpellRequest;
@@ -18,6 +14,9 @@ import com.lol.backend.modules.shop.repo.GameItemPurchaseRepository;
 import com.lol.backend.modules.shop.repo.GameSpellPurchaseRepository;
 import com.lol.backend.modules.shop.repo.ItemRepository;
 import com.lol.backend.modules.shop.repo.SpellRepository;
+import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.dto.GamePlayerStateDto;
+import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,8 +28,7 @@ public class ShopService {
     private static final int MAX_ITEM_COUNT = 3;
     private static final int MAX_SPELL_COUNT = 2;
 
-    private final GameRepository gameRepository;
-    private final GamePlayerRepository gamePlayerRepository;
+    private final GameStateStore gameStateStore;
     private final ItemRepository itemRepository;
     private final SpellRepository spellRepository;
     private final GameItemPurchaseRepository gameItemPurchaseRepository;
@@ -39,8 +37,7 @@ public class ShopService {
     private final GameInventoryService gameInventoryService;
 
     public ShopService(
-            GameRepository gameRepository,
-            GamePlayerRepository gamePlayerRepository,
+            GameStateStore gameStateStore,
             ItemRepository itemRepository,
             SpellRepository spellRepository,
             GameItemPurchaseRepository gameItemPurchaseRepository,
@@ -48,8 +45,7 @@ public class ShopService {
             BanPickService banPickService,
             GameInventoryService gameInventoryService
     ) {
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
+        this.gameStateStore = gameStateStore;
         this.itemRepository = itemRepository;
         this.spellRepository = spellRepository;
         this.gameItemPurchaseRepository = gameItemPurchaseRepository;
@@ -60,14 +56,14 @@ public class ShopService {
 
     @Transactional
     public GameStateResponse purchaseItem(UUID gameId, UUID userId, ShopItemRequest request) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        if (game.getStage() != GameStage.SHOP) {
+        if (!GameStage.SHOP.name().equals(game.stage())) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        GamePlayer player = gamePlayerRepository.findByGameIdAndUserId(gameId, userId)
+        GamePlayerStateDto player = gameStateStore.getGamePlayer(gameId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
         UUID itemId = UUID.fromString(request.itemId());
@@ -88,7 +84,7 @@ public class ShopService {
             throw new BusinessException(ErrorCode.MAX_ITEM_LIMIT);
         }
 
-        // 구매 기록 생성
+        // 구매 기록 생성 (write-through: 즉시 DB 저장)
         GameItemPurchase purchase = new GameItemPurchase(gameId, userId, itemId, request.quantity(), item.getPrice(), totalCost);
         gameItemPurchaseRepository.save(purchase);
 
@@ -97,14 +93,14 @@ public class ShopService {
 
     @Transactional
     public GameStateResponse purchaseSpell(UUID gameId, UUID userId, ShopSpellRequest request) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        if (game.getStage() != GameStage.SHOP) {
+        if (!GameStage.SHOP.name().equals(game.stage())) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        GamePlayer player = gamePlayerRepository.findByGameIdAndUserId(gameId, userId)
+        GamePlayerStateDto player = gameStateStore.getGamePlayer(gameId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
         UUID spellId = UUID.fromString(request.spellId());
@@ -125,7 +121,7 @@ public class ShopService {
             throw new BusinessException(ErrorCode.MAX_SPELL_LIMIT);
         }
 
-        // 구매 기록 생성
+        // 구매 기록 생성 (write-through: 즉시 DB 저장)
         GameSpellPurchase purchase = new GameSpellPurchase(gameId, userId, spellId, request.quantity(), spell.getPrice(), totalCost);
         gameSpellPurchaseRepository.save(purchase);
 

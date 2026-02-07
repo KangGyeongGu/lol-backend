@@ -9,11 +9,14 @@ import com.lol.backend.realtime.dto.EventType;
 import com.lol.backend.realtime.support.EventPublisher;
 import com.lol.backend.realtime.support.RoomMembershipChecker;
 import com.lol.backend.realtime.support.UserInfoProvider;
+import com.lol.backend.state.EphemeralStateStore;
+import com.lol.backend.state.dto.TypingStatusDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -24,20 +27,24 @@ import java.util.UUID;
 public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+    private static final Duration TYPING_TTL = Duration.ofSeconds(5);
 
     private final ChatMessageRepository chatMessageRepository;
     private final EventPublisher eventPublisher;
     private final RoomMembershipChecker roomMembershipChecker;
     private final UserInfoProvider userInfoProvider;
+    private final EphemeralStateStore ephemeralStateStore;
 
     public ChatService(ChatMessageRepository chatMessageRepository,
                        EventPublisher eventPublisher,
                        RoomMembershipChecker roomMembershipChecker,
-                       UserInfoProvider userInfoProvider) {
+                       UserInfoProvider userInfoProvider,
+                       EphemeralStateStore ephemeralStateStore) {
         this.chatMessageRepository = chatMessageRepository;
         this.eventPublisher = eventPublisher;
         this.roomMembershipChecker = roomMembershipChecker;
         this.userInfoProvider = userInfoProvider;
+        this.ephemeralStateStore = ephemeralStateStore;
     }
 
     /**
@@ -101,7 +108,7 @@ public class ChatService {
 
     /**
      * 타이핑 상태 업데이트.
-     * DB 저장 안 함 (ephemeral) → 이벤트만 브로드캐스트.
+     * Redis 저장 (ephemeral, TTL 5초) + 이벤트 브로드캐스트.
      */
     public void updateTypingStatus(String userId, String roomId, TypingUpdateCommandData commandData) {
         // 멤버십 확인
@@ -109,17 +116,31 @@ public class ChatService {
             throw new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM);
         }
 
+        UUID userUuid = UUID.fromString(userId);
+        UUID roomUuid = UUID.fromString(roomId);
+        Instant now = Instant.now();
+
+        // Redis에 타이핑 상태 저장 (TTL 5초)
+        TypingStatusDto typingStatus = new TypingStatusDto(
+                userUuid,
+                roomUuid,
+                commandData.isTyping(),
+                now
+        );
+        ephemeralStateStore.saveTypingStatus(typingStatus, TYPING_TTL);
+
+        // 이벤트 브로드캐스트
         TypingStatusChangedEventData eventData = new TypingStatusChangedEventData(
                 roomId,
                 userId,
                 commandData.isTyping(),
-                Instant.now().toString()
+                now.toString()
         );
 
         String topic = "/topic/rooms/" + roomId + "/typing";
         eventPublisher.broadcast(topic, EventType.TYPING_STATUS_CHANGED, eventData);
 
-        log.debug("Typing status updated: userId={}, roomId={}, isTyping={}",
+        log.debug("Typing status updated and saved to Redis: userId={}, roomId={}, isTyping={}",
                 userId, roomId, commandData.isTyping());
     }
 

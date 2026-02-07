@@ -69,6 +69,10 @@ public class RoomPlayer {
     // Setters
     public void setState(PlayerState state) { this.state = state; }
 
+    public void setLeftAt(Instant leftAt) { this.leftAt = leftAt; }
+
+    public void setDisconnectedAt(Instant disconnectedAt) { this.disconnectedAt = disconnectedAt; }
+
     public void leave() {
         this.leftAt = Instant.now();
     }

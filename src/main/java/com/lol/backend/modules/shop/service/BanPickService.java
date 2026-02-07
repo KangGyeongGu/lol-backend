@@ -2,22 +2,21 @@ package com.lol.backend.modules.shop.service;
 
 import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
-import com.lol.backend.modules.game.entity.Game;
-import com.lol.backend.modules.game.entity.GamePlayer;
 import com.lol.backend.modules.game.entity.GameStage;
-import com.lol.backend.modules.game.repo.GamePlayerRepository;
-import com.lol.backend.modules.game.repo.GameRepository;
+import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.dto.GamePlayerResponse;
 import com.lol.backend.modules.game.dto.GameStateResponse;
 import com.lol.backend.modules.game.dto.InventoryResponse;
 import com.lol.backend.modules.shop.dto.BanPickRequest;
-import com.lol.backend.modules.shop.entity.GameBan;
-import com.lol.backend.modules.shop.entity.GamePick;
 import com.lol.backend.modules.shop.repo.AlgorithmRepository;
-import com.lol.backend.modules.shop.repo.GameBanRepository;
-import com.lol.backend.modules.shop.repo.GamePickRepository;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
+import com.lol.backend.state.BanPickStateStore;
+import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.dto.GameBanDto;
+import com.lol.backend.state.dto.GamePickDto;
+import com.lol.backend.state.dto.GamePlayerStateDto;
+import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,50 +28,44 @@ import java.util.UUID;
 @Service
 public class BanPickService {
 
-    private final GameRepository gameRepository;
-    private final GamePlayerRepository gamePlayerRepository;
+    private final GameStateStore gameStateStore;
     private final UserRepository userRepository;
     private final AlgorithmRepository algorithmRepository;
-    private final GameBanRepository gameBanRepository;
-    private final GamePickRepository gamePickRepository;
+    private final BanPickStateStore banPickStateStore;
     private final GameInventoryService gameInventoryService;
 
     public BanPickService(
-            GameRepository gameRepository,
-            GamePlayerRepository gamePlayerRepository,
+            GameStateStore gameStateStore,
             UserRepository userRepository,
             AlgorithmRepository algorithmRepository,
-            GameBanRepository gameBanRepository,
-            GamePickRepository gamePickRepository,
+            BanPickStateStore banPickStateStore,
             GameInventoryService gameInventoryService
     ) {
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
+        this.gameStateStore = gameStateStore;
         this.userRepository = userRepository;
         this.algorithmRepository = algorithmRepository;
-        this.gameBanRepository = gameBanRepository;
-        this.gamePickRepository = gamePickRepository;
+        this.banPickStateStore = banPickStateStore;
         this.gameInventoryService = gameInventoryService;
     }
 
     @Transactional(readOnly = true)
     public GameStateResponse getGameState(UUID gameId, UUID userId) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        GamePlayer currentPlayer = gamePlayerRepository.findByGameIdAndUserId(gameId, userId)
+        GamePlayerStateDto currentPlayer = gameStateStore.getGamePlayer(gameId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
 
         // 플레이어 목록 조회
-        List<GamePlayer> allPlayers = gamePlayerRepository.findByGameId(gameId);
+        List<GamePlayerStateDto> allPlayers = gameStateStore.getGamePlayers(gameId);
         List<GamePlayerResponse> players = allPlayers.stream()
                 .map(gp -> {
-                    User user = userRepository.findById(gp.getUserId())
+                    User user = userRepository.findById(gp.userId())
                             .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
                     return new GamePlayerResponse(
                             user.getId().toString(),
                             user.getNickname(),
-                            gp.getScoreBefore()
+                            gp.scoreBefore()
                     );
                 })
                 .toList();
@@ -82,8 +75,8 @@ public class BanPickService {
 
         // remainingMs 계산
         long remainingMs = 0;
-        if (game.getStageDeadlineAt() != null) {
-            remainingMs = Duration.between(Instant.now(), game.getStageDeadlineAt()).toMillis();
+        if (game.stageDeadlineAt() != null) {
+            remainingMs = Duration.between(Instant.now(), game.stageDeadlineAt()).toMillis();
             if (remainingMs < 0) {
                 remainingMs = 0;
             }
@@ -93,10 +86,10 @@ public class BanPickService {
         int coin = gameInventoryService.calculateCoin(gameId, userId);
 
         return new GameStateResponse(
-                game.getId().toString(),
-                game.getRoomId().toString(),
-                game.getGameType(),
-                game.getStage(),
+                game.id().toString(),
+                game.roomId().toString(),
+                GameType.valueOf(game.gameType()),
+                GameStage.valueOf(game.stage()),
                 remainingMs,
                 players,
                 coin,
@@ -106,14 +99,16 @@ public class BanPickService {
 
     @Transactional
     public GameStateResponse submitBan(UUID gameId, UUID userId, BanPickRequest request) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        if (game.getStage() != GameStage.BAN) {
+        if (!GameStage.BAN.name().equals(game.stage())) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        if (gameBanRepository.existsByGameIdAndUserId(gameId, userId)) {
+        // Redis 기반 중복 체크
+        List<GameBanDto> existingBans = banPickStateStore.getBansByUser(gameId, userId);
+        if (!existingBans.isEmpty()) {
             throw new BusinessException(ErrorCode.DUPLICATED_BAN);
         }
 
@@ -122,22 +117,25 @@ public class BanPickService {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
 
-        GameBan gameBan = new GameBan(gameId, userId, algorithmId);
-        gameBanRepository.save(gameBan);
+        // Redis에 밴 저장 (write-back)
+        GameBanDto gameBan = new GameBanDto(UUID.randomUUID(), gameId, userId, algorithmId, Instant.now());
+        banPickStateStore.saveBan(gameBan);
 
         return getGameState(gameId, userId);
     }
 
     @Transactional
     public GameStateResponse submitPick(UUID gameId, UUID userId, BanPickRequest request) {
-        Game game = gameRepository.findById(gameId)
+        GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        if (game.getStage() != GameStage.PICK) {
+        if (!GameStage.PICK.name().equals(game.stage())) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        if (gamePickRepository.existsByGameIdAndUserId(gameId, userId)) {
+        // Redis 기반 중복 체크
+        List<GamePickDto> existingPicks = banPickStateStore.getPicksByUser(gameId, userId);
+        if (!existingPicks.isEmpty()) {
             throw new BusinessException(ErrorCode.DUPLICATED_PICK);
         }
 
@@ -146,8 +144,9 @@ public class BanPickService {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
 
-        GamePick gamePick = new GamePick(gameId, userId, algorithmId);
-        gamePickRepository.save(gamePick);
+        // Redis에 픽 저장 (write-back)
+        GamePickDto gamePick = new GamePickDto(UUID.randomUUID(), gameId, userId, algorithmId, Instant.now());
+        banPickStateStore.savePick(gamePick);
 
         return getGameState(gameId, userId);
     }
