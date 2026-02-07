@@ -5,6 +5,7 @@ import com.lol.backend.common.util.RequestContextHolder;
 import com.lol.backend.modules.stats.dto.ListOfAlgorithmPickBanRatesResponse;
 import com.lol.backend.modules.stats.dto.ListOfPlayerRankingsResponse;
 import com.lol.backend.modules.stats.service.StatsService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,13 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1/stats")
+@RequiredArgsConstructor
 public class StatsController {
 
     private final StatsService statsService;
-
-    public StatsController(StatsService statsService) {
-        this.statsService = statsService;
-    }
 
     /**
      * GET /api/v1/stats/realtime/player-rankings

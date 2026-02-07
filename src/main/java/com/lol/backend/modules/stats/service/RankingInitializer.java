@@ -3,11 +3,11 @@ package com.lol.backend.modules.stats.service;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.RankingStateStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -16,19 +16,14 @@ import java.util.stream.Collectors;
 /**
  * 서버 시작 시 DB의 모든 사용자 점수를 Redis Sorted Set에 로드한다.
  */
+@Slf4j
 @Component
 @Profile("!test")
+@RequiredArgsConstructor
 public class RankingInitializer implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(RankingInitializer.class);
 
     private final UserRepository userRepository;
     private final RankingStateStore rankingStateStore;
-
-    public RankingInitializer(UserRepository userRepository, RankingStateStore rankingStateStore) {
-        this.userRepository = userRepository;
-        this.rankingStateStore = rankingStateStore;
-    }
 
     @Override
     public void run(ApplicationArguments args) {

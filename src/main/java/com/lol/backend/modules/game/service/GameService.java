@@ -13,8 +13,8 @@ import com.lol.backend.state.GameStateStore;
 import com.lol.backend.state.SnapshotWriter;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,30 +26,16 @@ import java.util.UUID;
  * 게임 라이프사이클 서비스.
  * 게임 시작/전환/종료, stage 전이, active game 처리를 담당한다.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class GameService {
-
-    private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
     private final GameStateStore gameStateStore;
     private final UserRepository userRepository;
     private final GameInventoryService gameInventoryService;
     private final SnapshotWriter snapshotWriter;
     private final com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository;
-
-    public GameService(
-            GameStateStore gameStateStore,
-            UserRepository userRepository,
-            GameInventoryService gameInventoryService,
-            SnapshotWriter snapshotWriter,
-            com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository
-    ) {
-        this.gameStateStore = gameStateStore;
-        this.userRepository = userRepository;
-        this.gameInventoryService = gameInventoryService;
-        this.snapshotWriter = snapshotWriter;
-        this.submissionRepository = submissionRepository;
-    }
 
     /**
      * 게임 상태를 조회한다.

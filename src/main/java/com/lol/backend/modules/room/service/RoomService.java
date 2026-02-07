@@ -23,6 +23,7 @@ import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -31,6 +32,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class RoomService {
 
     private final RoomRepository roomRepository;
@@ -44,30 +46,6 @@ public class RoomService {
     private final RoomStateStore roomStateStore;
     private final GameStateStore gameStateStore;
     private final SnapshotWriter snapshotWriter;
-
-    public RoomService(RoomRepository roomRepository,
-                       RoomPlayerRepository roomPlayerRepository,
-                       RoomKickRepository roomKickRepository,
-                       RoomHostHistoryRepository roomHostHistoryRepository,
-                       GameRepository gameRepository,
-                       GamePlayerRepository gamePlayerRepository,
-                       UserRepository userRepository,
-                       RoomEventPublisher eventPublisher,
-                       RoomStateStore roomStateStore,
-                       GameStateStore gameStateStore,
-                       SnapshotWriter snapshotWriter) {
-        this.roomRepository = roomRepository;
-        this.roomPlayerRepository = roomPlayerRepository;
-        this.roomKickRepository = roomKickRepository;
-        this.roomHostHistoryRepository = roomHostHistoryRepository;
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
-        this.userRepository = userRepository;
-        this.eventPublisher = eventPublisher;
-        this.roomStateStore = roomStateStore;
-        this.gameStateStore = gameStateStore;
-        this.snapshotWriter = snapshotWriter;
-    }
 
     // ========== 1. getRooms ==========
     @Transactional(readOnly = true)

@@ -1,16 +1,15 @@
 package com.lol.backend.modules.room.event;
 
 import com.lol.backend.state.RoomStateStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class NoOpRoomEventPublisher implements RoomEventPublisher {
 
-    private static final Logger log = LoggerFactory.getLogger(NoOpRoomEventPublisher.class);
     private final RoomStateStore roomStateStore;
 
     public NoOpRoomEventPublisher(RoomStateStore roomStateStore) {

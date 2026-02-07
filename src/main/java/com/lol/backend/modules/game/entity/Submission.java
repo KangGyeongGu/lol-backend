@@ -2,6 +2,10 @@ package com.lol.backend.modules.game.entity;
 
 import com.lol.backend.modules.user.entity.Language;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,6 +14,8 @@ import java.util.UUID;
  * DATA_MODEL.md 5.12 기준.
  * storage: persistent (코드 제출 기록 보관)
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "submission")
 public class Submission {
@@ -53,8 +59,6 @@ public class Submission {
     @Column(name = "score_value")
     private Integer scoreValue;
 
-    protected Submission() {}
-
     public Submission(UUID gameId, UUID userId, Language language, String sourceCode,
                       int submittedElapsedMs, int execTimeMs, int memoryKb,
                       JudgeStatus judgeStatus, String judgeDetailJson, Integer scoreValue) {
@@ -74,18 +78,4 @@ public class Submission {
     protected void onCreate() {
         this.submittedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getGameId() { return gameId; }
-    public UUID getUserId() { return userId; }
-    public Language getLanguage() { return language; }
-    public String getSourceCode() { return sourceCode; }
-    public Instant getSubmittedAt() { return submittedAt; }
-    public int getSubmittedElapsedMs() { return submittedElapsedMs; }
-    public int getExecTimeMs() { return execTimeMs; }
-    public int getMemoryKb() { return memoryKb; }
-    public JudgeStatus getJudgeStatus() { return judgeStatus; }
-    public String getJudgeDetailJson() { return judgeDetailJson; }
-    public Integer getScoreValue() { return scoreValue; }
 }

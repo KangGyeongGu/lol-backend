@@ -2,6 +2,9 @@ package com.lol.backend.modules.chat.entity;
 
 import com.lol.backend.modules.chat.dto.ChatChannel;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -11,6 +14,8 @@ import java.util.UUID;
  * DATA_MODEL.md 5.18 CHAT_MESSAGE 기준.
  * FK 없이 UUID 컬럼만 저장한다 (User/Room 엔티티 부재).
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "chat_message")
 public class ChatMessage {
@@ -35,9 +40,6 @@ public class ChatMessage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    protected ChatMessage() {
-    }
-
     public ChatMessage(ChatChannel channelType, UUID roomId, UUID senderUserId, String message) {
         this.id = UUID.randomUUID();
         this.channelType = channelType;
@@ -45,29 +47,5 @@ public class ChatMessage {
         this.senderUserId = senderUserId;
         this.message = message;
         this.createdAt = Instant.now();
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public ChatChannel getChannelType() {
-        return channelType;
-    }
-
-    public UUID getRoomId() {
-        return roomId;
-    }
-
-    public UUID getSenderUserId() {
-        return senderUserId;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

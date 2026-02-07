@@ -3,8 +3,7 @@ package com.lol.backend.realtime.support;
 import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.realtime.dto.EventEnvelope;
 import com.lol.backend.realtime.dto.EventType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -14,10 +13,9 @@ import java.util.Map;
  * SimpMessagingTemplate 래퍼.
  * broadcast, sendToUser, sendError 편의 메서드를 제공한다.
  */
+@Slf4j
 @Component
 public class EventPublisher {
-
-    private static final Logger log = LoggerFactory.getLogger(EventPublisher.class);
 
     private final SimpMessagingTemplate messagingTemplate;
 

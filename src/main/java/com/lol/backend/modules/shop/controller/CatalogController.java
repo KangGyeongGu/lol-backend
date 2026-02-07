@@ -6,19 +6,17 @@ import com.lol.backend.modules.shop.dto.ListOfAlgorithmsResponse;
 import com.lol.backend.modules.shop.dto.ListOfItemsResponse;
 import com.lol.backend.modules.shop.dto.ListOfSpellsResponse;
 import com.lol.backend.modules.shop.service.CatalogService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/catalog")
+@RequiredArgsConstructor
 public class CatalogController {
 
     private final CatalogService catalogService;
-
-    public CatalogController(CatalogService catalogService) {
-        this.catalogService = catalogService;
-    }
 
     @GetMapping("/algorithms")
     public ApiResponse<ListOfAlgorithmsResponse> getAlgorithms() {

@@ -2,9 +2,16 @@ package com.lol.backend.modules.room.entity;
 
 import com.lol.backend.modules.game.entity.GameType;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "room")
 public class Room {
@@ -13,6 +20,7 @@ public class Room {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Setter
     @Column(name = "room_name", nullable = false, length = 30)
     private String roomName;
 
@@ -27,6 +35,7 @@ public class Room {
     @Column(name = "max_players", nullable = false)
     private int maxPlayers;
 
+    @Setter
     @Column(name = "host_user_id", nullable = false)
     private UUID hostUserId;
 
@@ -35,8 +44,6 @@ public class Room {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    protected Room() {}
 
     public Room(String roomName, GameType gameType,
                 com.lol.backend.modules.user.entity.Language language,
@@ -58,24 +65,5 @@ public class Room {
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = Instant.now();
-    }
-
-    // Getters
-    public UUID getId() { return id; }
-    public String getRoomName() { return roomName; }
-    public GameType getGameType() { return gameType; }
-    public com.lol.backend.modules.user.entity.Language getLanguage() { return language; }
-    public int getMaxPlayers() { return maxPlayers; }
-    public UUID getHostUserId() { return hostUserId; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
-
-    // Setters for mutable fields
-    public void setRoomName(String roomName) {
-        this.roomName = roomName;
-    }
-
-    public void setHostUserId(UUID hostUserId) {
-        this.hostUserId = hostUserId;
     }
 }

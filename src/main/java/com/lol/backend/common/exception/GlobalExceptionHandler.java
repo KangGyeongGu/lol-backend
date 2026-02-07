@@ -3,8 +3,7 @@ package com.lol.backend.common.exception;
 import com.lol.backend.common.dto.ErrorDetail;
 import com.lol.backend.common.dto.ErrorResponse;
 import com.lol.backend.common.util.RequestContextHolder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -19,9 +18,9 @@ import java.util.stream.Collectors;
  * 글로벌 예외 핸들러.
  * ERROR_MODEL.md 에러 Envelope 규칙에 따라 응답을 생성한다.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
      * 비즈니스 예외 처리.

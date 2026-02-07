@@ -1,6 +1,7 @@
 package com.lol.backend.config;
 
 import com.lol.backend.common.interceptor.RequestIdInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -10,13 +11,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * Spring MVC 글로벌 설정.
  */
 @Configuration
+@RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final RequestIdInterceptor requestIdInterceptor;
-
-    public WebMvcConfig(RequestIdInterceptor requestIdInterceptor) {
-        this.requestIdInterceptor = requestIdInterceptor;
-    }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

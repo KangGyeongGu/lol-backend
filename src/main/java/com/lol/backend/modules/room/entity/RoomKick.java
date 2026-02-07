@@ -1,9 +1,15 @@
 package com.lol.backend.modules.room.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "room_kick")
 public class RoomKick {
@@ -24,8 +30,6 @@ public class RoomKick {
     @Column(name = "kicked_at", nullable = false, updatable = false)
     private Instant kickedAt;
 
-    protected RoomKick() {}
-
     public RoomKick(UUID roomId, UUID userId, UUID kickedByUserId) {
         this.roomId = roomId;
         this.userId = userId;
@@ -36,11 +40,4 @@ public class RoomKick {
     protected void onCreate() {
         this.kickedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getRoomId() { return roomId; }
-    public UUID getUserId() { return userId; }
-    public UUID getKickedByUserId() { return kickedByUserId; }
-    public Instant getKickedAt() { return kickedAt; }
 }

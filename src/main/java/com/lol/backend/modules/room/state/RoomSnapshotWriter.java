@@ -8,8 +8,7 @@ import com.lol.backend.state.RoomStateStore;
 import com.lol.backend.state.SnapshotWriter;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +16,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Component
 public class RoomSnapshotWriter implements SnapshotWriter {
-
-    private static final Logger log = LoggerFactory.getLogger(RoomSnapshotWriter.class);
 
     private final RoomStateStore roomStateStore;
     private final RoomRepository roomRepository;

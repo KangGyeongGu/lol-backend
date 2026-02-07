@@ -2,8 +2,7 @@ package com.lol.backend.state.impl;
 
 import com.lol.backend.state.RankingStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -20,10 +19,9 @@ import java.util.stream.Collectors;
  * - member: userId (String)
  * - score: 사용자 점수 (int)
  */
+@Slf4j
 @Service
 public class RedisRankingStateStore implements RankingStateStore {
-
-    private static final Logger log = LoggerFactory.getLogger(RedisRankingStateStore.class);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ZSetOperations<String, String> zSetOps;

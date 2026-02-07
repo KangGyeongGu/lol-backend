@@ -6,8 +6,7 @@ import com.lol.backend.state.BanPickStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -16,11 +15,10 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Primary
 public class BanPickStateStoreImpl implements BanPickStateStore {
-
-    private static final Logger log = LoggerFactory.getLogger(BanPickStateStoreImpl.class);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;

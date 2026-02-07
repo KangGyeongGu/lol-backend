@@ -15,6 +15,7 @@ import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.RankingStateStore;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
  * 실시간 플레이어 랭킹과 알고리즘 밴/픽률 통계를 제공한다.
  */
 @Service
+@RequiredArgsConstructor
 public class StatsService {
 
     private final UserRepository userRepository;
@@ -33,20 +35,6 @@ public class StatsService {
     private final GameBanRepository gameBanRepository;
     private final GamePickRepository gamePickRepository;
     private final RankingStateStore rankingStateStore;
-
-    public StatsService(UserRepository userRepository,
-                        GameRepository gameRepository,
-                        AlgorithmRepository algorithmRepository,
-                        GameBanRepository gameBanRepository,
-                        GamePickRepository gamePickRepository,
-                        RankingStateStore rankingStateStore) {
-        this.userRepository = userRepository;
-        this.gameRepository = gameRepository;
-        this.algorithmRepository = algorithmRepository;
-        this.gameBanRepository = gameBanRepository;
-        this.gamePickRepository = gamePickRepository;
-        this.rankingStateStore = rankingStateStore;
-    }
 
     /**
      * 실시간 플레이어 랭킹 조회.

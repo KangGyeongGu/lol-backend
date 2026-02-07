@@ -5,6 +5,7 @@ import com.lol.backend.common.util.RequestContextHolder;
 import com.lol.backend.modules.game.dto.*;
 import com.lol.backend.modules.game.service.GameService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,13 +17,10 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/games")
+@RequiredArgsConstructor
 public class GameController {
 
     private final GameService gameService;
-
-    public GameController(GameService gameService) {
-        this.gameService = gameService;
-    }
 
     /**
      * GET /games/{gameId}/state

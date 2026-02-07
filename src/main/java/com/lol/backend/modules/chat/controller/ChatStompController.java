@@ -9,11 +9,11 @@ import com.lol.backend.realtime.dto.CommandEnvelope;
 import com.lol.backend.realtime.dto.EventEnvelope;
 import com.lol.backend.realtime.dto.EventMeta;
 import com.lol.backend.realtime.dto.EventType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
@@ -23,16 +23,12 @@ import java.util.Map;
 /**
  * 채팅/타이핑 STOMP 핸들러.
  */
+@Slf4j
 @Controller
+@RequiredArgsConstructor
 public class ChatStompController {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatStompController.class);
-
     private final ChatService chatService;
-
-    public ChatStompController(ChatService chatService) {
-        this.chatService = chatService;
-    }
 
     /**
      * CHAT_SEND 커맨드 처리.

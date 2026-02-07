@@ -9,8 +9,8 @@ import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
 import com.lol.backend.state.dto.TypingStatusDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -25,18 +25,13 @@ import java.util.UUID;
  * - CONNECTION_HEARTBEAT: Redis String + TTL (~30초)
  * - ITEM_EFFECT_ACTIVE: Redis String + TTL (아이템 지속 시간)
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class RedisEphemeralStateStore implements EphemeralStateStore {
-
-    private static final Logger log = LoggerFactory.getLogger(RedisEphemeralStateStore.class);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-
-    public RedisEphemeralStateStore(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper) {
-        this.redisTemplate = redisTemplate;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     public void saveTypingStatus(TypingStatusDto typingStatus, Duration ttl) {

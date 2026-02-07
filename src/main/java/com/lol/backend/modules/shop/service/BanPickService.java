@@ -18,6 +18,7 @@ import com.lol.backend.state.dto.GamePickDto;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class BanPickService {
 
     private final GameStateStore gameStateStore;
@@ -33,20 +35,6 @@ public class BanPickService {
     private final AlgorithmRepository algorithmRepository;
     private final BanPickStateStore banPickStateStore;
     private final GameInventoryService gameInventoryService;
-
-    public BanPickService(
-            GameStateStore gameStateStore,
-            UserRepository userRepository,
-            AlgorithmRepository algorithmRepository,
-            BanPickStateStore banPickStateStore,
-            GameInventoryService gameInventoryService
-    ) {
-        this.gameStateStore = gameStateStore;
-        this.userRepository = userRepository;
-        this.algorithmRepository = algorithmRepository;
-        this.banPickStateStore = banPickStateStore;
-        this.gameInventoryService = gameInventoryService;
-    }
 
     @Transactional(readOnly = true)
     public GameStateResponse getGameState(UUID gameId, UUID userId) {

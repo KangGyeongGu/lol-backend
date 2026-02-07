@@ -1,9 +1,15 @@
 package com.lol.backend.modules.shop.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "item")
 public class Item {
@@ -30,8 +36,6 @@ public class Item {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    protected Item() {}
-
     public Item(String name, String description, int durationSec, int price, boolean isActive) {
         this.name = name;
         this.description = description;
@@ -44,13 +48,4 @@ public class Item {
     protected void onCreate() {
         this.createdAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public String getName() { return name; }
-    public String getDescription() { return description; }
-    public int getDurationSec() { return durationSec; }
-    public int getPrice() { return price; }
-    public boolean isActive() { return isActive; }
-    public Instant getCreatedAt() { return createdAt; }
 }

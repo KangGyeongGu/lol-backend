@@ -2,9 +2,16 @@ package com.lol.backend.modules.room.entity;
 
 import com.lol.backend.modules.user.entity.User;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "room_player")
 public class RoomPlayer {
@@ -19,6 +26,7 @@ public class RoomPlayer {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private PlayerState state;
@@ -26,17 +34,17 @@ public class RoomPlayer {
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;
 
+    @Setter
     @Column(name = "left_at")
     private Instant leftAt;
 
+    @Setter
     @Column(name = "disconnected_at")
     private Instant disconnectedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
-
-    protected RoomPlayer() {}
 
     public RoomPlayer(UUID roomId, UUID userId, PlayerState state) {
         this.roomId = roomId;
@@ -55,23 +63,6 @@ public class RoomPlayer {
     protected void onCreate() {
         this.joinedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getRoomId() { return roomId; }
-    public UUID getUserId() { return userId; }
-    public PlayerState getState() { return state; }
-    public Instant getJoinedAt() { return joinedAt; }
-    public Instant getLeftAt() { return leftAt; }
-    public Instant getDisconnectedAt() { return disconnectedAt; }
-    public User getUser() { return user; }
-
-    // Setters
-    public void setState(PlayerState state) { this.state = state; }
-
-    public void setLeftAt(Instant leftAt) { this.leftAt = leftAt; }
-
-    public void setDisconnectedAt(Instant disconnectedAt) { this.disconnectedAt = disconnectedAt; }
 
     public void leave() {
         this.leftAt = Instant.now();

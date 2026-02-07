@@ -1,6 +1,10 @@
 package com.lol.backend.modules.shop.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,6 +13,8 @@ import java.util.UUID;
  * DATA_MODEL.md 5.14 기준.
  * storage: persistent (스펠 사용 로그 보관)
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "spell_usage")
 public class SpellUsage {
@@ -29,8 +35,6 @@ public class SpellUsage {
     @Column(name = "used_at", nullable = false, updatable = false)
     private Instant usedAt;
 
-    protected SpellUsage() {}
-
     public SpellUsage(UUID gameId, UUID userId, UUID spellId) {
         this.gameId = gameId;
         this.userId = userId;
@@ -41,11 +45,4 @@ public class SpellUsage {
     protected void onCreate() {
         this.usedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getGameId() { return gameId; }
-    public UUID getUserId() { return userId; }
-    public UUID getSpellId() { return spellId; }
-    public Instant getUsedAt() { return usedAt; }
 }

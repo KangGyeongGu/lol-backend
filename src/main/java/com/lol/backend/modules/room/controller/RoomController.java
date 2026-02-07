@@ -10,6 +10,7 @@ import com.lol.backend.modules.room.service.RoomService;
 import com.lol.backend.modules.user.entity.Language;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -17,13 +18,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/rooms")
+@RequiredArgsConstructor
 public class RoomController {
 
     private final RoomService roomService;
-
-    public RoomController(RoomService roomService) {
-        this.roomService = roomService;
-    }
 
     // GET /rooms
     @GetMapping

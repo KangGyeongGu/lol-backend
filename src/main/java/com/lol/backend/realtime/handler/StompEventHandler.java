@@ -2,8 +2,8 @@ package com.lol.backend.realtime.handler;
 
 import com.lol.backend.state.EphemeralStateStore;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
@@ -18,17 +18,14 @@ import java.util.UUID;
  * STOMP 연결/해제 이벤트 핸들러.
  * CONNECT/DISCONNECT 시 CONNECTION_HEARTBEAT를 Redis에 저장한다.
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class StompEventHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(StompEventHandler.class);
     private static final Duration HEARTBEAT_TTL = Duration.ofSeconds(30);
 
     private final EphemeralStateStore ephemeralStateStore;
-
-    public StompEventHandler(EphemeralStateStore ephemeralStateStore) {
-        this.ephemeralStateStore = ephemeralStateStore;
-    }
 
     @EventListener
     public void handleSessionConnected(SessionConnectedEvent event) {

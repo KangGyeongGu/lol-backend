@@ -10,6 +10,7 @@ import com.lol.backend.modules.shop.dto.ShopSpellRequest;
 import com.lol.backend.modules.shop.service.BanPickService;
 import com.lol.backend.modules.shop.service.ShopService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -21,15 +22,11 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/games")
+@RequiredArgsConstructor
 public class BanPickShopController {
 
     private final BanPickService banPickService;
     private final ShopService shopService;
-
-    public BanPickShopController(BanPickService banPickService, ShopService shopService) {
-        this.banPickService = banPickService;
-        this.shopService = shopService;
-    }
 
     @PostMapping("/{gameId}/ban")
     public ApiResponse<GameStateResponse> submitBan(

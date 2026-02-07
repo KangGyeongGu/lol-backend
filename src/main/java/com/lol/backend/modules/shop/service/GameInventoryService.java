@@ -8,11 +8,13 @@ import com.lol.backend.modules.shop.repo.GameSpellPurchaseRepository;
 import com.lol.backend.modules.shop.repo.ItemUsageRepository;
 import com.lol.backend.modules.shop.repo.SpellUsageRepository;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class GameInventoryService {
 
     public static final int INITIAL_SHOP_COIN = 3000;
@@ -21,17 +23,6 @@ public class GameInventoryService {
     private final GameSpellPurchaseRepository gameSpellPurchaseRepository;
     private final ItemUsageRepository itemUsageRepository;
     private final SpellUsageRepository spellUsageRepository;
-
-    public GameInventoryService(
-            GameItemPurchaseRepository gameItemPurchaseRepository,
-            GameSpellPurchaseRepository gameSpellPurchaseRepository,
-            ItemUsageRepository itemUsageRepository,
-            SpellUsageRepository spellUsageRepository) {
-        this.gameItemPurchaseRepository = gameItemPurchaseRepository;
-        this.gameSpellPurchaseRepository = gameSpellPurchaseRepository;
-        this.itemUsageRepository = itemUsageRepository;
-        this.spellUsageRepository = spellUsageRepository;
-    }
 
     /**
      * 현재 잔여 코인을 계산한다.

@@ -1,9 +1,15 @@
 package com.lol.backend.modules.room.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "room_host_history")
 public class RoomHostHistory {
@@ -28,8 +34,6 @@ public class RoomHostHistory {
     @Column(name = "changed_at", nullable = false, updatable = false)
     private Instant changedAt;
 
-    protected RoomHostHistory() {}
-
     public RoomHostHistory(UUID roomId, UUID fromUserId, UUID toUserId, HostChangeReason reason) {
         this.roomId = roomId;
         this.fromUserId = fromUserId;
@@ -41,12 +45,4 @@ public class RoomHostHistory {
     protected void onCreate() {
         this.changedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getRoomId() { return roomId; }
-    public UUID getFromUserId() { return fromUserId; }
-    public UUID getToUserId() { return toUserId; }
-    public HostChangeReason getReason() { return reason; }
-    public Instant getChangedAt() { return changedAt; }
 }

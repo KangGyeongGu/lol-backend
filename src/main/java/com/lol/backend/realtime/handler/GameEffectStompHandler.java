@@ -21,8 +21,8 @@ import com.lol.backend.realtime.dto.*;
 import com.lol.backend.realtime.support.EventPublisher;
 import com.lol.backend.state.EphemeralStateStore;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -38,10 +38,10 @@ import java.util.*;
 /**
  * 게임 이펙트(아이템/스펠 사용) STOMP 핸들러.
  */
+@Slf4j
 @Controller
+@RequiredArgsConstructor
 public class GameEffectStompHandler {
-
-    private static final Logger log = LoggerFactory.getLogger(GameEffectStompHandler.class);
 
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
@@ -53,29 +53,6 @@ public class GameEffectStompHandler {
     private final GameInventoryService gameInventoryService;
     private final EventPublisher eventPublisher;
     private final EphemeralStateStore ephemeralStateStore;
-
-    public GameEffectStompHandler(
-            GameRepository gameRepository,
-            GamePlayerRepository gamePlayerRepository,
-            ItemRepository itemRepository,
-            SpellRepository spellRepository,
-            ItemUsageRepository itemUsageRepository,
-            SpellUsageRepository spellUsageRepository,
-            GameSpellPurchaseRepository gameSpellPurchaseRepository,
-            GameInventoryService gameInventoryService,
-            EventPublisher eventPublisher,
-            EphemeralStateStore ephemeralStateStore) {
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
-        this.itemRepository = itemRepository;
-        this.spellRepository = spellRepository;
-        this.itemUsageRepository = itemUsageRepository;
-        this.spellUsageRepository = spellUsageRepository;
-        this.gameSpellPurchaseRepository = gameSpellPurchaseRepository;
-        this.gameInventoryService = gameInventoryService;
-        this.eventPublisher = eventPublisher;
-        this.ephemeralStateStore = ephemeralStateStore;
-    }
 
     /**
      * ITEM_USE 커맨드 처리.

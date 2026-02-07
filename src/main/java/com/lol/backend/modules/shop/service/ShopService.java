@@ -18,11 +18,13 @@ import com.lol.backend.state.GameStateStore;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class ShopService {
 
     private static final int MAX_ITEM_COUNT = 3;
@@ -35,24 +37,6 @@ public class ShopService {
     private final GameSpellPurchaseRepository gameSpellPurchaseRepository;
     private final BanPickService banPickService;
     private final GameInventoryService gameInventoryService;
-
-    public ShopService(
-            GameStateStore gameStateStore,
-            ItemRepository itemRepository,
-            SpellRepository spellRepository,
-            GameItemPurchaseRepository gameItemPurchaseRepository,
-            GameSpellPurchaseRepository gameSpellPurchaseRepository,
-            BanPickService banPickService,
-            GameInventoryService gameInventoryService
-    ) {
-        this.gameStateStore = gameStateStore;
-        this.itemRepository = itemRepository;
-        this.spellRepository = spellRepository;
-        this.gameItemPurchaseRepository = gameItemPurchaseRepository;
-        this.gameSpellPurchaseRepository = gameSpellPurchaseRepository;
-        this.banPickService = banPickService;
-        this.gameInventoryService = gameInventoryService;
-    }
 
     @Transactional
     public GameStateResponse purchaseItem(UUID gameId, UUID userId, ShopItemRequest request) {

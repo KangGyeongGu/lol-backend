@@ -1,9 +1,16 @@
 package com.lol.backend.modules.game.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "game")
 public class Game {
@@ -19,29 +26,32 @@ public class Game {
     @Column(name = "game_type", nullable = false, length = 20)
     private GameType gameType;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GameStage stage;
 
+    @Setter
     @Column(name = "stage_started_at")
     private Instant stageStartedAt;
 
+    @Setter
     @Column(name = "stage_deadline_at")
     private Instant stageDeadlineAt;
 
     @Column(name = "started_at")
     private Instant startedAt;
 
+    @Setter
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    @Setter
     @Column(name = "final_algorithm_id")
     private UUID finalAlgorithmId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
-
-    protected Game() {}
 
     public Game(UUID roomId, GameType gameType) {
         this.roomId = roomId;
@@ -54,25 +64,6 @@ public class Game {
     protected void onCreate() {
         this.createdAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getRoomId() { return roomId; }
-    public GameType getGameType() { return gameType; }
-    public GameStage getStage() { return stage; }
-    public Instant getStageStartedAt() { return stageStartedAt; }
-    public Instant getStageDeadlineAt() { return stageDeadlineAt; }
-    public Instant getStartedAt() { return startedAt; }
-    public Instant getFinishedAt() { return finishedAt; }
-    public UUID getFinalAlgorithmId() { return finalAlgorithmId; }
-    public Instant getCreatedAt() { return createdAt; }
-
-    // Setters
-    public void setStage(GameStage stage) { this.stage = stage; }
-    public void setStageStartedAt(Instant stageStartedAt) { this.stageStartedAt = stageStartedAt; }
-    public void setStageDeadlineAt(Instant stageDeadlineAt) { this.stageDeadlineAt = stageDeadlineAt; }
-    public void setFinalAlgorithmId(UUID finalAlgorithmId) { this.finalAlgorithmId = finalAlgorithmId; }
-    public void setFinishedAt(Instant finishedAt) { this.finishedAt = finishedAt; }
 
     // Business Logic Methods
 

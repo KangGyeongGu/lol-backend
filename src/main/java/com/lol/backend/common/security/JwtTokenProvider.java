@@ -2,8 +2,7 @@ package com.lol.backend.common.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,9 +14,9 @@ import java.util.Date;
  * JWT 토큰 생성 및 검증을 담당하는 유틸리티.
  * 실제 구현에서는 application.yml에서 secret과 expiration을 설정한다.
  */
+@Slf4j
 @Component
 public class JwtTokenProvider {
-    private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
     private final SecretKey secretKey;
     private final long validityInMilliseconds;

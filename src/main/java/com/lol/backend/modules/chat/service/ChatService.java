@@ -11,9 +11,9 @@ import com.lol.backend.realtime.support.RoomMembershipChecker;
 import com.lol.backend.realtime.support.UserInfoProvider;
 import com.lol.backend.state.EphemeralStateStore;
 import com.lol.backend.state.dto.TypingStatusDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -23,10 +23,11 @@ import java.util.UUID;
 /**
  * 채팅 전송 / 타이핑 비즈니스 로직.
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ChatService {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final Duration TYPING_TTL = Duration.ofSeconds(5);
 
     private final ChatMessageRepository chatMessageRepository;
@@ -34,18 +35,6 @@ public class ChatService {
     private final RoomMembershipChecker roomMembershipChecker;
     private final UserInfoProvider userInfoProvider;
     private final EphemeralStateStore ephemeralStateStore;
-
-    public ChatService(ChatMessageRepository chatMessageRepository,
-                       EventPublisher eventPublisher,
-                       RoomMembershipChecker roomMembershipChecker,
-                       UserInfoProvider userInfoProvider,
-                       EphemeralStateStore ephemeralStateStore) {
-        this.chatMessageRepository = chatMessageRepository;
-        this.eventPublisher = eventPublisher;
-        this.roomMembershipChecker = roomMembershipChecker;
-        this.userInfoProvider = userInfoProvider;
-        this.ephemeralStateStore = ephemeralStateStore;
-    }
 
     /**
      * 채팅 메시지 전송.

@@ -14,8 +14,8 @@ import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -23,11 +23,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Slf4j
 @Component
 @Profile("!test")
+@RequiredArgsConstructor
 public class RoomStateInitializer implements ApplicationRunner {
-
-    private static final Logger log = LoggerFactory.getLogger(RoomStateInitializer.class);
 
     private final RoomRepository roomRepository;
     private final RoomPlayerRepository roomPlayerRepository;
@@ -35,20 +35,6 @@ public class RoomStateInitializer implements ApplicationRunner {
     private final GamePlayerRepository gamePlayerRepository;
     private final RoomStateStore roomStateStore;
     private final GameStateStore gameStateStore;
-
-    public RoomStateInitializer(RoomRepository roomRepository,
-                                RoomPlayerRepository roomPlayerRepository,
-                                GameRepository gameRepository,
-                                GamePlayerRepository gamePlayerRepository,
-                                RoomStateStore roomStateStore,
-                                GameStateStore gameStateStore) {
-        this.roomRepository = roomRepository;
-        this.roomPlayerRepository = roomPlayerRepository;
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
-        this.roomStateStore = roomStateStore;
-        this.gameStateStore = gameStateStore;
-    }
 
     @Override
     public void run(ApplicationArguments args) {

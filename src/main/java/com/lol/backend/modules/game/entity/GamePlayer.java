@@ -1,9 +1,16 @@
 package com.lol.backend.modules.game.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "game_player")
 public class GamePlayer {
@@ -18,6 +25,7 @@ public class GamePlayer {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GamePlayerState state;
@@ -25,41 +33,49 @@ public class GamePlayer {
     @Column(name = "score_before", nullable = false)
     private int scoreBefore;
 
+    @Setter
     @Column(name = "score_after")
     private Integer scoreAfter;
 
+    @Setter
     @Column(name = "score_delta")
     private Integer scoreDelta;
 
+    @Setter
     @Column(name = "final_score_value")
     private Integer finalScoreValue;
 
+    @Setter
     @Column(name = "rank_in_game")
     private Integer rankInGame;
 
+    @Setter
     @Column(name = "solved")
     private Boolean solved;
 
+    @Setter
     @Enumerated(EnumType.STRING)
     @Column(length = 10)
     private MatchResult result;
 
+    @Setter
     @Column(name = "coin_delta")
     private Integer coinDelta;
 
+    @Setter
     @Column(name = "exp_delta")
     private Double expDelta;
 
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt;
 
+    @Setter
     @Column(name = "left_at")
     private Instant leftAt;
 
+    @Setter
     @Column(name = "disconnected_at")
     private Instant disconnectedAt;
-
-    protected GamePlayer() {}
 
     public GamePlayer(UUID gameId, UUID userId, int scoreBefore) {
         this.gameId = gameId;
@@ -72,35 +88,4 @@ public class GamePlayer {
     protected void onCreate() {
         this.joinedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getGameId() { return gameId; }
-    public UUID getUserId() { return userId; }
-    public GamePlayerState getState() { return state; }
-    public int getScoreBefore() { return scoreBefore; }
-    public Integer getScoreAfter() { return scoreAfter; }
-    public Integer getScoreDelta() { return scoreDelta; }
-    public Integer getFinalScoreValue() { return finalScoreValue; }
-    public Integer getRankInGame() { return rankInGame; }
-    public Boolean getSolved() { return solved; }
-    public MatchResult getResult() { return result; }
-    public Integer getCoinDelta() { return coinDelta; }
-    public Double getExpDelta() { return expDelta; }
-    public Instant getJoinedAt() { return joinedAt; }
-    public Instant getLeftAt() { return leftAt; }
-    public Instant getDisconnectedAt() { return disconnectedAt; }
-
-    // Setters
-    public void setState(GamePlayerState state) { this.state = state; }
-    public void setScoreAfter(Integer scoreAfter) { this.scoreAfter = scoreAfter; }
-    public void setScoreDelta(Integer scoreDelta) { this.scoreDelta = scoreDelta; }
-    public void setFinalScoreValue(Integer finalScoreValue) { this.finalScoreValue = finalScoreValue; }
-    public void setRankInGame(Integer rankInGame) { this.rankInGame = rankInGame; }
-    public void setSolved(Boolean solved) { this.solved = solved; }
-    public void setResult(MatchResult result) { this.result = result; }
-    public void setCoinDelta(Integer coinDelta) { this.coinDelta = coinDelta; }
-    public void setExpDelta(Double expDelta) { this.expDelta = expDelta; }
-    public void setLeftAt(Instant leftAt) { this.leftAt = leftAt; }
-    public void setDisconnectedAt(Instant disconnectedAt) { this.disconnectedAt = disconnectedAt; }
 }

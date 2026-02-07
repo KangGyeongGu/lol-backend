@@ -11,25 +11,19 @@ import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final KakaoApiClient kakaoApiClient;
     private final AuthTokenProvider authTokenProvider;
     private final UserRepository userRepository;
-
-    public AuthService(KakaoApiClient kakaoApiClient,
-                       AuthTokenProvider authTokenProvider,
-                       UserRepository userRepository) {
-        this.kakaoApiClient = kakaoApiClient;
-        this.authTokenProvider = authTokenProvider;
-        this.userRepository = userRepository;
-    }
 
     @Transactional
     public LoginResponse kakaoLogin(KakaoLoginRequest request) {

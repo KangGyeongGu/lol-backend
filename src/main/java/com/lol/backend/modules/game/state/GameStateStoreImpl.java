@@ -6,8 +6,7 @@ import com.lol.backend.state.GameStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -17,11 +16,10 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Primary
 public class GameStateStoreImpl implements GameStateStore {
-
-    private static final Logger log = LoggerFactory.getLogger(GameStateStoreImpl.class);
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;

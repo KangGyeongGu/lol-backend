@@ -14,6 +14,7 @@ import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -23,19 +24,12 @@ import java.util.UUID;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
-
-    public UserService(UserRepository userRepository,
-                      GameRepository gameRepository,
-                      GamePlayerRepository gamePlayerRepository) {
-        this.userRepository = userRepository;
-        this.gameRepository = gameRepository;
-        this.gamePlayerRepository = gamePlayerRepository;
-    }
 
     public UserProfileResponse getMyProfile(String userId) {
         User user = userRepository.findById(UUID.fromString(userId))

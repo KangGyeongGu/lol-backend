@@ -1,6 +1,10 @@
 package com.lol.backend.modules.shop.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -9,6 +13,8 @@ import java.util.UUID;
  * DATA_MODEL.md 5.11 기준.
  * storage: persistent (구매 이력 보관)
  */
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "game_spell_purchase")
 public class GameSpellPurchase {
@@ -38,8 +44,6 @@ public class GameSpellPurchase {
     @Column(name = "purchased_at", nullable = false, updatable = false)
     private Instant purchasedAt;
 
-    protected GameSpellPurchase() {}
-
     public GameSpellPurchase(UUID gameId, UUID userId, UUID spellId, int quantity, int unitPrice, int totalPrice) {
         this.gameId = gameId;
         this.userId = userId;
@@ -53,14 +57,4 @@ public class GameSpellPurchase {
     protected void onCreate() {
         this.purchasedAt = Instant.now();
     }
-
-    // Getters
-    public UUID getId() { return id; }
-    public UUID getGameId() { return gameId; }
-    public UUID getUserId() { return userId; }
-    public UUID getSpellId() { return spellId; }
-    public int getQuantity() { return quantity; }
-    public int getUnitPrice() { return unitPrice; }
-    public int getTotalPrice() { return totalPrice; }
-    public Instant getPurchasedAt() { return purchasedAt; }
 }

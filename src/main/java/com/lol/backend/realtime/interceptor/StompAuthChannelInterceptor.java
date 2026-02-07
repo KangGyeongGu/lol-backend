@@ -1,8 +1,7 @@
 package com.lol.backend.realtime.interceptor;
 
 import com.lol.backend.common.security.JwtTokenProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -18,10 +17,10 @@ import java.security.Principal;
  * - CONNECT: JWT 인증 → accessor.setUser(principal)
  * - SUBSCRIBE: 인증 여부 확인
  */
+@Slf4j
 @Component
 public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
-    private static final Logger log = LoggerFactory.getLogger(StompAuthChannelInterceptor.class);
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;

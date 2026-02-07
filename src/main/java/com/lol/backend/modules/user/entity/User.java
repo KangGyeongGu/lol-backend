@@ -1,10 +1,16 @@
 package com.lol.backend.modules.user.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Entity
 @Table(name = "users")
 public class User {
@@ -26,15 +32,19 @@ public class User {
     @Column(nullable = false, length = 30)
     private String tier = "Iron";
 
+    @Setter
     @Column(nullable = false)
     private int score = 0;
 
+    @Setter
     @Column(nullable = false)
     private double exp = 0.0;
 
+    @Setter
     @Column(nullable = false)
     private int coin = 1000;
 
+    @Setter
     @Column(name = "active_game_id")
     private UUID activeGameId;
 
@@ -43,9 +53,6 @@ public class User {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
-
-    protected User() {
-    }
 
     private User(String kakaoId, String nickname, Language language) {
         this.kakaoId = kakaoId;
@@ -90,35 +97,5 @@ public class User {
         int divisionIndex = ((score - 300) % 500) / 100;
 
         return tierNames[tierIndex] + " " + divisions[divisionIndex];
-    }
-
-    // Getters
-    public UUID getId() { return id; }
-    public String getKakaoId() { return kakaoId; }
-    public String getNickname() { return nickname; }
-    public Language getLanguage() { return language; }
-    public String getTier() { return tier; }
-    public int getScore() { return score; }
-    public double getExp() { return exp; }
-    public int getCoin() { return coin; }
-    public UUID getActiveGameId() { return activeGameId; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
-
-    // Setters for cross-module use
-    public void setActiveGameId(UUID activeGameId) {
-        this.activeGameId = activeGameId;
-    }
-
-    public void setScore(int score) {
-        this.score = score;
-    }
-
-    public void setCoin(int coin) {
-        this.coin = coin;
-    }
-
-    public void setExp(double exp) {
-        this.exp = exp;
     }
 }

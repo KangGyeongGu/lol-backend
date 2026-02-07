@@ -5,8 +5,8 @@ import com.lol.backend.realtime.support.EventPublisher;
 import com.lol.backend.state.EphemeralStateStore;
 import com.lol.backend.state.GameStateStore;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -21,23 +21,14 @@ import java.util.UUID;
  * - 만료된 효과는 Redis에서 제거하고 EFFECT_REMOVED 이벤트 발행
  * - Redis에서 활성 게임 목록을 조회 (write-back 정책에서 DB는 최종 스냅샷만 반영)
  */
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class EffectExpirationScheduler {
-
-    private static final Logger log = LoggerFactory.getLogger(EffectExpirationScheduler.class);
 
     private final GameStateStore gameStateStore;
     private final EphemeralStateStore ephemeralStateStore;
     private final EventPublisher eventPublisher;
-
-    public EffectExpirationScheduler(
-            GameStateStore gameStateStore,
-            EphemeralStateStore ephemeralStateStore,
-            EventPublisher eventPublisher) {
-        this.gameStateStore = gameStateStore;
-        this.ephemeralStateStore = ephemeralStateStore;
-        this.eventPublisher = eventPublisher;
-    }
 
     /**
      * 1초마다 활성 게임의 만료된 효과를 체크하고 이벤트 발행.
