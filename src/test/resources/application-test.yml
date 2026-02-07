@@ -1,0 +1,33 @@
+# 테스트 환경 설정
+jwt:
+  secret: test-secret-key-for-jwt-token-must-be-at-least-256-bits-long-for-hs256-algorithm-test
+  expiration: 3600000
+
+kakao:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost:3000
+
+auth:
+  signup-token-expiration: 300000
+  refresh-token-expiration: 604800000
+
+spring:
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    schemas: public
+    validate-on-migrate: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  data:
+    redis:
+      timeout: 2000ms
+
+logging:
+  level:
+    com.lol.backend: INFO
+    org.springframework.test: INFO
