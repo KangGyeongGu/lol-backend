@@ -52,11 +52,11 @@ public class EffectExpirationScheduler {
             for (ItemEffectActiveDto effect : activeEffects) {
                 // 3. 만료 체크
                 if (effect.expiresAt().isBefore(now) || effect.expiresAt().equals(now)) {
-                    // 4. EFFECT_REMOVED 이벤트 발행 (SSOT EVENTS.md 7.4)
+                    // 4. EFFECT_REMOVED 이벤트 발행 (SSOT EVENTS.md 7.4, TASK-9: M-4)
                     Map<String, Object> removedData = Map.of(
                             "effectId", effect.uniqueId(),
                             "gameId", gameId.toString(),
-                            "effectType", "ITEM", // 아이템/스펠 구분은 추후 필요 시 개선
+                            "effectType", effect.effectType(), // "ITEM" or "SPELL"
                             "targetUserId", effect.userId().toString(),
                             "reason", "EXPIRED",
                             "removedAt", now.toString()

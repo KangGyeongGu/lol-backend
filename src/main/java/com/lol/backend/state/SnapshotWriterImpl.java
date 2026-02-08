@@ -311,19 +311,13 @@ public class SnapshotWriterImpl implements SnapshotWriter {
         for (GameBanDto banDto : bans) {
             // 이미 저장되어 있는지 확인 (중복 방지)
             if (!gameBanRepository.existsById(banDto.id())) {
-                GameBan gameBan = new GameBan(banDto.gameId(), banDto.userId(), banDto.algorithmId());
-                // ID와 createdAt를 명시적으로 설정 (DTO에서 온 값 사용)
-                try {
-                    java.lang.reflect.Field idField = GameBan.class.getDeclaredField("id");
-                    idField.setAccessible(true);
-                    idField.set(gameBan, banDto.id());
-
-                    java.lang.reflect.Field createdAtField = GameBan.class.getDeclaredField("createdAt");
-                    createdAtField.setAccessible(true);
-                    createdAtField.set(gameBan, banDto.createdAt());
-                } catch (Exception e) {
-                    log.warn("Failed to set ban fields via reflection, using defaults: {}", e.getMessage());
-                }
+                GameBan gameBan = GameBan.restore(
+                        banDto.id(),
+                        banDto.gameId(),
+                        banDto.userId(),
+                        banDto.algorithmId(),
+                        banDto.createdAt()
+                );
                 gameBanRepository.save(gameBan);
                 log.debug("Ban saved to DB: id={}, gameId={}, userId={}", banDto.id(), banDto.gameId(), banDto.userId());
             }
@@ -334,19 +328,13 @@ public class SnapshotWriterImpl implements SnapshotWriter {
         for (GamePickDto pickDto : picks) {
             // 이미 저장되어 있는지 확인 (중복 방지)
             if (!gamePickRepository.existsById(pickDto.id())) {
-                GamePick gamePick = new GamePick(pickDto.gameId(), pickDto.userId(), pickDto.algorithmId());
-                // ID와 createdAt를 명시적으로 설정 (DTO에서 온 값 사용)
-                try {
-                    java.lang.reflect.Field idField = GamePick.class.getDeclaredField("id");
-                    idField.setAccessible(true);
-                    idField.set(gamePick, pickDto.id());
-
-                    java.lang.reflect.Field createdAtField = GamePick.class.getDeclaredField("createdAt");
-                    createdAtField.setAccessible(true);
-                    createdAtField.set(gamePick, pickDto.createdAt());
-                } catch (Exception e) {
-                    log.warn("Failed to set pick fields via reflection, using defaults: {}", e.getMessage());
-                }
+                GamePick gamePick = GamePick.restore(
+                        pickDto.id(),
+                        pickDto.gameId(),
+                        pickDto.userId(),
+                        pickDto.algorithmId(),
+                        pickDto.createdAt()
+                );
                 gamePickRepository.save(gamePick);
                 log.debug("Pick saved to DB: id={}, gameId={}, userId={}", pickDto.id(), pickDto.gameId(), pickDto.userId());
             }

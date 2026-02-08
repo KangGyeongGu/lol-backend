@@ -183,7 +183,8 @@ class RedisEphemeralStateStoreTest {
                 itemId,
                 "effect-1",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
         Duration ttl = Duration.ofSeconds(10);
 
@@ -200,6 +201,7 @@ class RedisEphemeralStateStoreTest {
         assertThat(retrieved.uniqueId()).isEqualTo("effect-1");
         assertThat(retrieved.startedAt()).isNotNull();
         assertThat(retrieved.expiresAt()).isNotNull();
+        assertThat(retrieved.effectType()).isEqualTo("ITEM");
     }
 
     @Test
@@ -215,7 +217,8 @@ class RedisEphemeralStateStoreTest {
                 itemId,
                 "effect-1",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
         Duration ttl = Duration.ofSeconds(10);
         String key = RedisKeyBuilder.effect(gameId, "effect-1");
@@ -243,7 +246,8 @@ class RedisEphemeralStateStoreTest {
                 UUID.randomUUID(),
                 "effect-1",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
         ItemEffectActiveDto effect2 = new ItemEffectActiveDto(
                 gameId,
@@ -251,7 +255,8 @@ class RedisEphemeralStateStoreTest {
                 UUID.randomUUID(),
                 "effect-2",
                 now,
-                now.plusSeconds(15)
+                now.plusSeconds(15),
+                "SPELL"
         );
 
         Duration ttl1 = Duration.ofSeconds(10);
@@ -294,7 +299,8 @@ class RedisEphemeralStateStoreTest {
                 itemId,
                 "effect-1",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
         Duration ttl = Duration.ofSeconds(10);
 
@@ -332,7 +338,8 @@ class RedisEphemeralStateStoreTest {
                 UUID.randomUUID(),
                 "effect-1",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
         ItemEffectActiveDto effect2 = new ItemEffectActiveDto(
                 gameId2,
@@ -340,7 +347,8 @@ class RedisEphemeralStateStoreTest {
                 UUID.randomUUID(),
                 "effect-2",
                 now,
-                now.plusSeconds(10)
+                now.plusSeconds(10),
+                "ITEM"
         );
 
         Duration ttl = Duration.ofSeconds(10);

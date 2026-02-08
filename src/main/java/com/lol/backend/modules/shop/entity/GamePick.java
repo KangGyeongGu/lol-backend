@@ -43,6 +43,17 @@ public class GamePick {
         this.algorithmId = algorithmId;
     }
 
+    /**
+     * Redis 스냅샷 복원용 팩토리 메서드.
+     * ID와 createdAt를 명시적으로 설정.
+     */
+    public static GamePick restore(UUID id, UUID gameId, UUID userId, UUID algorithmId, Instant createdAt) {
+        GamePick gamePick = new GamePick(gameId, userId, algorithmId);
+        gamePick.id = id;
+        gamePick.createdAt = createdAt;
+        return gamePick;
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = Instant.now();

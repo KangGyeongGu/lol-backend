@@ -43,6 +43,17 @@ public class GameBan {
         this.algorithmId = algorithmId;
     }
 
+    /**
+     * Redis 스냅샷 복원용 팩토리 메서드.
+     * ID와 createdAt를 명시적으로 설정.
+     */
+    public static GameBan restore(UUID id, UUID gameId, UUID userId, UUID algorithmId, Instant createdAt) {
+        GameBan gameBan = new GameBan(gameId, userId, algorithmId);
+        gameBan.id = id;
+        gameBan.createdAt = createdAt;
+        return gameBan;
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = Instant.now();
