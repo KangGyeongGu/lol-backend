@@ -195,16 +195,108 @@ public class GameService {
 
     /**
      * 게임 결과를 계산하고 GamePlayer 상태를 갱신한다.
+     * 제출 기반 순위 산정 및 차등 보상 적용.
      */
     private void calculateAndSaveGameResults(UUID gameId) {
-        List<GamePlayerStateDto> players = gameStateStore.getGamePlayers(gameId);
+        GameStateDto game = gameStateStore.getGame(gameId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
-        // 간단한 결과 계산 예시 (실제 로직은 게임 규칙에 따라 구현)
-        // 여기서는 모든 플레이어에게 기본 보상을 지급하는 예시
-        for (GamePlayerStateDto player : players) {
-            int scoreDelta = 10; // 기본 점수 증가
-            int coinDelta = 50; // 기본 코인 보상
-            double expDelta = 100.0; // 기본 경험치 보상
+        List<GamePlayerStateDto> players = gameStateStore.getGamePlayers(gameId);
+        boolean isRanked = game.gameType().equals(GameType.RANKED.name());
+
+        // AC(정답) 제출만 조회
+        List<com.lol.backend.modules.game.entity.Submission> acSubmissions =
+                submissionRepository.findByGameIdAndJudgeStatus(gameId, com.lol.backend.modules.game.entity.JudgeStatus.AC);
+
+        // userId별 AC 수와 최종 제출 시간 계산
+        var submissionStats = acSubmissions.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        com.lol.backend.modules.game.entity.Submission::getUserId,
+                        java.util.stream.Collectors.collectingAndThen(
+                                java.util.stream.Collectors.toList(),
+                                list -> new SubmissionStat(
+                                        list.size(), // AC 수
+                                        list.stream()
+                                                .mapToInt(com.lol.backend.modules.game.entity.Submission::getSubmittedElapsedMs)
+                                                .max()
+                                                .orElse(Integer.MAX_VALUE) // 최종 제출 시간
+                                )
+                        )
+                ));
+
+        // 순위 계산: AC 수 내림차순 → 제출 시간 오름차순
+        var rankedPlayers = players.stream()
+                .map(player -> {
+                    SubmissionStat stat = submissionStats.getOrDefault(
+                            player.userId(),
+                            new SubmissionStat(0, Integer.MAX_VALUE) // 제출 없음
+                    );
+                    return new PlayerRank(player, stat.acCount, stat.lastSubmitTime);
+                })
+                .sorted(java.util.Comparator
+                        .comparingInt(PlayerRank::acCount).reversed()
+                        .thenComparingInt(PlayerRank::lastSubmitTime))
+                .toList();
+
+        // 순위 계산 (1차 패스: 순위만 배정)
+        int[] ranks = new int[rankedPlayers.size()];
+        ranks[0] = 1;
+        for (int i = 1; i < rankedPlayers.size(); i++) {
+            PlayerRank pr = rankedPlayers.get(i);
+            PlayerRank prev = rankedPlayers.get(i - 1);
+            if (pr.acCount == prev.acCount && pr.lastSubmitTime == prev.lastSubmitTime) {
+                ranks[i] = ranks[i - 1]; // 동점 → 같은 순위
+            } else {
+                ranks[i] = i + 1;
+            }
+        }
+
+        // 동점 여부 판별: 같은 순위가 2명 이상이면 동점
+        var rankCounts = new java.util.HashMap<Integer, Integer>();
+        for (int rank : ranks) {
+            rankCounts.merge(rank, 1, Integer::sum);
+        }
+
+        // 2차 패스: 보상 적용
+        for (int i = 0; i < rankedPlayers.size(); i++) {
+            PlayerRank pr = rankedPlayers.get(i);
+            int currentRank = ranks[i];
+            boolean isTied = rankCounts.get(currentRank) > 1;
+
+            // 보상 계산
+            int scoreDelta;
+            int coinDelta;
+            double expDelta;
+            String result;
+
+            if (isRanked) {
+                // RANKED 모드: 순위별 차등 보상
+                if (currentRank == 1) {
+                    scoreDelta = 30;
+                    coinDelta = 100;
+                    expDelta = 50.0;
+                    result = isTied ? "DRAW" : "WIN";
+                } else if (currentRank == 2) {
+                    scoreDelta = 10;
+                    coinDelta = 50;
+                    expDelta = 30.0;
+                    result = isTied ? "DRAW" : "WIN";
+                } else {
+                    scoreDelta = -10;
+                    coinDelta = 20;
+                    expDelta = 20.0;
+                    result = isTied ? "DRAW" : "LOSE";
+                }
+            } else {
+                // NORMAL 모드: scoreDelta=0, coinDelta/expDelta 고정
+                scoreDelta = 0;
+                coinDelta = 50;
+                expDelta = 30.0;
+                result = "DRAW";
+            }
+
+            GamePlayerStateDto player = pr.player;
+            boolean solved = pr.acCount > 0;
 
             GamePlayerStateDto updatedPlayer = new GamePlayerStateDto(
                     player.id(),
@@ -215,9 +307,9 @@ public class GameService {
                     player.scoreBefore() + scoreDelta,
                     scoreDelta,
                     player.finalScoreValue(),
-                    player.rankInGame(),
-                    player.solved(),
-                    "DRAW", // 기본 결과
+                    currentRank,
+                    solved,
+                    result,
                     coinDelta,
                     expDelta,
                     player.joinedAt(),
@@ -227,7 +319,19 @@ public class GameService {
 
             gameStateStore.updateGamePlayer(gameId, player.userId(), updatedPlayer);
         }
+
+        log.info("Game results calculated: gameId={}, isRanked={}, playerCount={}", gameId, isRanked, players.size());
     }
+
+    /**
+     * 제출 통계 (AC 수, 최종 제출 시간)
+     */
+    private record SubmissionStat(int acCount, int lastSubmitTime) {}
+
+    /**
+     * 플레이어 순위 정보
+     */
+    private record PlayerRank(GamePlayerStateDto player, int acCount, int lastSubmitTime) {}
 
     /**
      * stage 전이 규칙을 검증한다.
@@ -275,7 +379,7 @@ public class GameService {
             case BAN -> 60; // 1분
             case PICK -> 60; // 1분
             case SHOP -> 120; // 2분
-            case PLAY -> 1800; // 30분
+            case PLAY -> 3600; // 60분
             default -> 0; // LOBBY, FINISHED는 deadline 없음
         };
 
