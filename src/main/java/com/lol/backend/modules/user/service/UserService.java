@@ -6,17 +6,22 @@ import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.modules.game.dto.ActiveGameResponse;
 import com.lol.backend.modules.game.entity.Game;
 import com.lol.backend.modules.game.entity.GamePlayer;
+import com.lol.backend.modules.game.entity.GameStage;
+import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.entity.MatchResult;
 import com.lol.backend.modules.game.repo.GamePlayerRepository;
 import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.user.dto.*;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
+import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,6 +35,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
+    private final GameStateStore gameStateStore;
 
     public UserProfileResponse getMyProfile(String userId) {
         User user = userRepository.findById(UUID.fromString(userId))
@@ -45,14 +51,49 @@ public class UserService {
             return null;
         }
 
-        Game game = gameRepository.findById(user.getActiveGameId())
+        // Redis SSOT: GameStateStore에서 진행 중인 게임 상태 조회
+        GameStateDto gameState = gameStateStore.getGame(user.getActiveGameId())
                 .orElse(null);
 
-        if (game == null) {
+        if (gameState == null) {
+            // Redis에 게임이 없으면 active game이 없는 것으로 처리
             return null;
         }
 
-        return ActiveGameResponse.from(game);
+        return buildActiveGameResponse(gameState);
+    }
+
+    private ActiveGameResponse buildActiveGameResponse(GameStateDto gameState) {
+        GameStage stage = GameStage.valueOf(gameState.stage());
+        GameType gameType = GameType.valueOf(gameState.gameType());
+        String pageRoute = resolvePageRoute(stage);
+        Integer remainingMs = calculateRemainingMs(gameState);
+
+        return new ActiveGameResponse(
+                gameState.id().toString(),
+                gameState.roomId().toString(),
+                stage,
+                pageRoute,
+                gameType,
+                remainingMs
+        );
+    }
+
+    private String resolvePageRoute(GameStage stage) {
+        return switch (stage) {
+            case LOBBY -> "WAITING_ROOM";
+            case BAN, PICK, SHOP -> "BAN_PICK_SHOP";
+            case PLAY -> "IN_GAME";
+            case FINISHED -> "WAITING_ROOM";
+        };
+    }
+
+    private Integer calculateRemainingMs(GameStateDto gameState) {
+        if (gameState.stageDeadlineAt() == null) {
+            return null;
+        }
+        long remaining = Duration.between(Instant.now(), gameState.stageDeadlineAt()).toMillis();
+        return (int) Math.max(0, remaining);
     }
 
     public UserStatsResponse getMyStats(String userId) {

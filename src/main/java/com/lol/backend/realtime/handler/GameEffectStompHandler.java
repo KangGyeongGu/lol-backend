@@ -2,14 +2,10 @@ package com.lol.backend.realtime.handler;
 
 import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
-import com.lol.backend.modules.game.entity.Game;
+import com.lol.backend.modules.game.dto.InventoryResponse;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.repo.GamePlayerRepository;
-import com.lol.backend.modules.game.repo.GameRepository;
-import com.lol.backend.modules.game.dto.InventoryItemResponse;
-import com.lol.backend.modules.game.dto.InventoryResponse;
-import com.lol.backend.modules.game.dto.InventorySpellResponse;
 import com.lol.backend.modules.shop.entity.*;
 import com.lol.backend.modules.shop.repo.GameSpellPurchaseRepository;
 import com.lol.backend.modules.shop.repo.ItemRepository;
@@ -20,6 +16,8 @@ import com.lol.backend.modules.shop.service.GameInventoryService;
 import com.lol.backend.realtime.dto.*;
 import com.lol.backend.realtime.support.EventPublisher;
 import com.lol.backend.state.EphemeralStateStore;
+import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +41,11 @@ import java.util.*;
 @RequiredArgsConstructor
 public class GameEffectStompHandler {
 
-    private final GameRepository gameRepository;
+    // 스펠 이름 상수 (TASK-12: L-5, L-6)
+    private static final String SPELL_CLEANSE = "정화";
+    private static final String SPELL_SHIELD = "보호막";
+
+    private final GameStateStore gameStateStore;
     private final GamePlayerRepository gamePlayerRepository;
     private final ItemRepository itemRepository;
     private final SpellRepository spellRepository;
@@ -72,12 +74,14 @@ public class GameEffectStompHandler {
         UUID itemId = parseUUID(envelope.data().itemId());
         UUID targetUserId = parseUUID(envelope.data().targetUserId());
 
-        // 3. Game 조회
-        Game game = gameRepository.findById(gameUuid)
+        // 3. Game 조회 (Redis GameStateStore에서)
+        GameStateDto gameState = gameStateStore.getGame(gameUuid)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         // 4. Game stage 검증: stage == PLAY && gameType == RANKED
-        if (game.getStage() != GameStage.PLAY || game.getGameType() != GameType.RANKED) {
+        GameStage currentStage = GameStage.valueOf(gameState.stage());
+        GameType currentGameType = GameType.valueOf(gameState.gameType());
+        if (currentStage != GameStage.PLAY || currentGameType != GameType.RANKED) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
@@ -131,12 +135,14 @@ public class GameEffectStompHandler {
         UUID gameUuid = parseUUID(gameId);
         UUID spellId = parseUUID(envelope.data().spellId());
 
-        // 3. Game 조회
-        Game game = gameRepository.findById(gameUuid)
+        // 3. Game 조회 (Redis GameStateStore에서)
+        GameStateDto gameState = gameStateStore.getGame(gameUuid)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
         // 4. Game stage 검증: stage == PLAY && gameType == RANKED
-        if (game.getStage() != GameStage.PLAY || game.getGameType() != GameType.RANKED) {
+        GameStage currentStage = GameStage.valueOf(gameState.stage());
+        GameType currentGameType = GameType.valueOf(gameState.gameType());
+        if (currentStage != GameStage.PLAY || currentGameType != GameType.RANKED) {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
@@ -174,22 +180,23 @@ public class GameEffectStompHandler {
         );
         eventPublisher.broadcast("/topic/games/" + gameUuid, EventType.SPELL_EFFECT_APPLIED, effectData);
 
-        // Redis에 ITEM_EFFECT_ACTIVE 저장 (Spell도 동일한 구조로 저장, itemId에 spellId 사용)
+        // Redis에 SPELL_EFFECT_ACTIVE 저장 (TASK-9: M-5)
         ItemEffectActiveDto effectDto = new ItemEffectActiveDto(
                 gameUuid,
                 userId,
                 spellId, // spellId를 itemId 필드에 저장 (ephemeral 상태이므로 구조 공유)
                 effectId,
                 spellStartedAt,
-                spellExpiresAt
+                spellExpiresAt,
+                "SPELL" // effectType: SPELL
         );
         ephemeralStateStore.saveEffect(effectDto, Duration.ofSeconds(spell.getDurationSec()));
 
         log.debug("Saved SPELL_EFFECT_ACTIVE to Redis: gameId={}, effectId={}, userId={}, spellId={}, durationSec={}",
                 gameUuid, effectId, userId, spellId, spell.getDurationSec());
 
-        // 10. 정화(cleanse) 스펠인지 확인 → EFFECT_REMOVED (SSOT EVENTS.md 7.4)
-        if ("정화".equals(spell.getName())) {
+        // 10. 정화(cleanse) 스펠인지 확인 → EFFECT_REMOVED (SSOT EVENTS.md 7.4, TASK-12: L-5)
+        if (SPELL_CLEANSE.equals(spell.getName())) {
             Map<String, Object> removedData = Map.of(
                     "effectId", usage.getId().toString(),
                     "gameId", gameUuid.toString(),
@@ -213,8 +220,8 @@ public class GameEffectStompHandler {
      * @return true if blocked, false if applied
      */
     private boolean checkShieldAndApplyEffect(UUID gameId, UUID fromUserId, UUID targetUserId, ItemUsage usage, Item item) {
-        // SSOT: 보호막은 Spell (CATALOG.md)
-        Optional<Spell> shieldSpellOpt = spellRepository.findByName("보호막");
+        // SSOT: 보호막은 Spell (CATALOG.md, TASK-12: L-6)
+        Optional<Spell> shieldSpellOpt = spellRepository.findByName(SPELL_SHIELD);
         if (shieldSpellOpt.isPresent()) {
             Spell shieldSpell = shieldSpellOpt.get();
             UUID shieldSpellId = shieldSpell.getId();
@@ -272,14 +279,15 @@ public class GameEffectStompHandler {
         );
         eventPublisher.broadcast("/topic/games/" + gameId, EventType.ITEM_EFFECT_APPLIED, data);
 
-        // Redis에 ITEM_EFFECT_ACTIVE 저장 (TTL = durationSec)
+        // Redis에 ITEM_EFFECT_ACTIVE 저장 (TTL = durationSec, TASK-9: M-5)
         ItemEffectActiveDto effectDto = new ItemEffectActiveDto(
                 gameId,
                 toUserId,
                 item.getId(),
                 effectId,
                 startedAt,
-                expiresAt
+                expiresAt,
+                "ITEM" // effectType: ITEM
         );
         ephemeralStateStore.saveEffect(effectDto, Duration.ofSeconds(item.getDurationSec()));
 
