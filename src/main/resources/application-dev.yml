@@ -42,6 +42,11 @@ spring:
       host: localhost
       port: 6379
 
+# 개발용 stage 제한시간 (짧게 설정)
+game:
+  stage-duration:
+    play: 10
+
 # 로깅 레벨
 logging:
   level:

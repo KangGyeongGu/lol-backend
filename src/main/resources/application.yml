@@ -34,6 +34,14 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+# 게임 stage별 제한시간 (초) - GAME_RULES.md 기준
+game:
+  stage-duration:
+    ban: 10
+    pick: 10
+    shop: 10
+    play: 10
+
 # 로깅 설정
 logging:
   level:
