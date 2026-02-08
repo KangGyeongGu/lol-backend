@@ -268,7 +268,7 @@ public class RoomService {
             }
             roomStateStore.incrementListVersion();
             long listVersion = roomStateStore.getListVersion();
-            eventPublisher.roomListRemoved(roomId, listVersion, "DISBANDED");
+            eventPublisher.roomListRemoved(roomId, listVersion, "ROOM_CLOSED");
             return;
         }
 
@@ -312,7 +312,7 @@ public class RoomService {
                     roomId,
                     userId,
                     newHostUserId,
-                    "HOST_LEFT",
+                    "LEAVE",
                     Instant.now().toString()
             );
         }
@@ -463,6 +463,8 @@ public class RoomService {
         eventPublisher.roomListRemoved(roomId, listVersion, "GAME_STARTED");
         eventPublisher.gameStarted(roomId, game.getId());
 
+        // 게임은 LOBBY 상태로 생성되며, GameStageScheduler가 1초 이내에 첫 stage(BAN/PLAY)로 자동 전이
+
         return ActiveGameResponse.from(game);
     }
 
@@ -495,6 +497,7 @@ public class RoomService {
         roomStateStore.addPlayer(updatedPlayer);
 
         roomStateStore.incrementListVersion();
+        long listVersion = roomStateStore.getListVersion();
         eventPublisher.playerKicked(
                 roomId,
                 targetUserId,
@@ -502,6 +505,10 @@ public class RoomService {
                 Instant.now().toString()
         );
         eventPublisher.playerLeft(roomId, targetUserId, Instant.now().toString(), "KICKED");
+
+        // 방 목록 인원수 갱신
+        RoomSummaryResponse summary = buildRoomSummary(roomId);
+        eventPublisher.roomListUpsert(summary, listVersion);
 
         return buildRoomDetailResponse(roomId);
     }
