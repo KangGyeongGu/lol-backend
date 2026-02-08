@@ -28,6 +28,7 @@ import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;
 import com.lol.backend.state.dto.GamePlayerStateDto;
+import jakarta.persistence.EntityManager;
 import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.RoomHostHistoryStateDto;
 import com.lol.backend.state.dto.RoomKickStateDto;
@@ -59,6 +60,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
     private final GamePickRepository gamePickRepository;
     private final UserRepository userRepository;
     private final RankingStateStore rankingStateStore;
+    private final EntityManager entityManager;
 
     public SnapshotWriterImpl(
             RoomStateStore roomStateStore,
@@ -73,7 +75,8 @@ public class SnapshotWriterImpl implements SnapshotWriter {
             GameBanRepository gameBanRepository,
             GamePickRepository gamePickRepository,
             UserRepository userRepository,
-            RankingStateStore rankingStateStore
+            RankingStateStore rankingStateStore,
+            EntityManager entityManager
     ) {
         this.roomStateStore = roomStateStore;
         this.gameStateStore = gameStateStore;
@@ -88,6 +91,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
         this.gamePickRepository = gamePickRepository;
         this.userRepository = userRepository;
         this.rankingStateStore = rankingStateStore;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -118,7 +122,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
                     roomState.createdAt(),
                     roomState.updatedAt()
             );
-            roomRepository.save(dbRoom);
+            entityManager.persist(dbRoom);
         }
         log.debug("Room saved to DB: roomId={}", roomId);
 
@@ -145,7 +149,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
                         playerState.leftAt(),
                         playerState.disconnectedAt()
                 );
-                roomPlayerRepository.save(dbPlayer);
+                entityManager.persist(dbPlayer);
             }
             log.debug("RoomPlayer saved to DB: id={}", playerState.id());
         }
@@ -318,7 +322,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
                         banDto.algorithmId(),
                         banDto.createdAt()
                 );
-                gameBanRepository.save(gameBan);
+                entityManager.persist(gameBan);
                 log.debug("Ban saved to DB: id={}, gameId={}, userId={}", banDto.id(), banDto.gameId(), banDto.userId());
             }
         }
@@ -335,7 +339,7 @@ public class SnapshotWriterImpl implements SnapshotWriter {
                         pickDto.algorithmId(),
                         pickDto.createdAt()
                 );
-                gamePickRepository.save(gamePick);
+                entityManager.persist(gamePick);
                 log.debug("Pick saved to DB: id={}, gameId={}, userId={}", pickDto.id(), pickDto.gameId(), pickDto.userId());
             }
         }

@@ -17,7 +17,6 @@ import java.util.UUID;
 public class Room {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Setter
@@ -48,6 +47,7 @@ public class Room {
     public Room(String roomName, GameType gameType,
                 com.lol.backend.modules.user.entity.Language language,
                 int maxPlayers, UUID hostUserId) {
+        this.id = UUID.randomUUID();
         this.roomName = roomName;
         this.gameType = gameType;
         this.language = language;

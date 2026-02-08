@@ -17,7 +17,6 @@ import java.util.UUID;
 public class RoomPlayer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "room_id", nullable = false)
@@ -47,12 +46,14 @@ public class RoomPlayer {
     private User user;
 
     public RoomPlayer(UUID roomId, UUID userId, PlayerState state) {
+        this.id = UUID.randomUUID();
         this.roomId = roomId;
         this.userId = userId;
         this.state = state;
     }
 
     public RoomPlayer(UUID roomId, User user, PlayerState state) {
+        this.id = UUID.randomUUID();
         this.roomId = roomId;
         this.userId = user.getId();
         this.user = user;

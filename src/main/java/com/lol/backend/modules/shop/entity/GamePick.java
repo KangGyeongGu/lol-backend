@@ -22,7 +22,6 @@ import java.util.UUID;
 public class GamePick {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(name = "game_id", nullable = false)
@@ -38,6 +37,7 @@ public class GamePick {
     private Instant createdAt;
 
     public GamePick(UUID gameId, UUID userId, UUID algorithmId) {
+        this.id = UUID.randomUUID();
         this.gameId = gameId;
         this.userId = userId;
         this.algorithmId = algorithmId;
