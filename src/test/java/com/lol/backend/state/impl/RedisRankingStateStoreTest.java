@@ -1,8 +1,8 @@
 package com.lol.backend.state.impl;
 
 import com.lol.backend.config.TestcontainersConfig;
-import com.lol.backend.state.RankingStateStore;
-import com.lol.backend.state.RankingStateStore.UserScore;
+import com.lol.backend.state.store.RankingStateStore;
+import com.lol.backend.state.store.RankingStateStore.UserScore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

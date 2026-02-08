@@ -2,7 +2,7 @@ package com.lol.backend.modules.stats.service;
 
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.RankingStateStore;
+import com.lol.backend.state.store.RankingStateStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

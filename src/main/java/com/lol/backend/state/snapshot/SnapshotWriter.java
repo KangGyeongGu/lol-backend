@@ -1,4 +1,4 @@
-package com.lol.backend.state;
+package com.lol.backend.state.snapshot;
 
 import java.util.UUID;
 

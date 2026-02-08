@@ -1,7 +1,7 @@
 package com.lol.backend.modules.room.state;
 
 import com.lol.backend.config.TestcontainersConfig;
-import com.lol.backend.state.RoomStateStore;
+import com.lol.backend.state.store.RoomStateStore;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
 import org.junit.jupiter.api.AfterEach;

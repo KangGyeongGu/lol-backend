@@ -1,6 +1,6 @@
 package com.lol.backend.realtime.handler;
 
-import com.lol.backend.state.EphemeralStateStore;
+import com.lol.backend.state.store.EphemeralStateStore;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

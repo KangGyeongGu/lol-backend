@@ -13,7 +13,7 @@ import com.lol.backend.modules.stats.dto.ListOfPlayerRankingsResponse;
 import com.lol.backend.modules.stats.dto.PlayerRankingResponse;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.RankingStateStore;
+import com.lol.backend.state.store.RankingStateStore;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;

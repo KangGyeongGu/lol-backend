@@ -1,7 +1,7 @@
 package com.lol.backend.state.impl;
 
 import com.lol.backend.config.TestcontainersConfig;
-import com.lol.backend.state.EphemeralStateStore;
+import com.lol.backend.state.store.EphemeralStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
 import com.lol.backend.state.dto.ItemEffectActiveDto;

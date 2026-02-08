@@ -1,7 +1,7 @@
 package com.lol.backend.modules.shop.state;
 
 import com.lol.backend.config.TestcontainersConfig;
-import com.lol.backend.state.BanPickStateStore;
+import com.lol.backend.state.store.BanPickStateStore;
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;
 import org.junit.jupiter.api.AfterEach;

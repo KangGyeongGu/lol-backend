@@ -5,18 +5,20 @@ import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.modules.game.dto.ActiveGameResponse;
 import com.lol.backend.modules.game.entity.Game;
 import com.lol.backend.modules.game.entity.GamePlayer;
+import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.repo.GamePlayerRepository;
 import com.lol.backend.modules.game.repo.GameRepository;
+import com.lol.backend.modules.game.service.GameService;
 import com.lol.backend.modules.room.dto.*;
 import com.lol.backend.modules.room.entity.*;
 import com.lol.backend.modules.room.event.RoomEventPublisher;
 import com.lol.backend.modules.user.entity.Language;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.GameStateStore;
-import com.lol.backend.state.RoomStateStore;
-import com.lol.backend.state.SnapshotWriter;
+import com.lol.backend.state.snapshot.SnapshotWriter;
+import com.lol.backend.state.store.GameStateStore;
+import com.lol.backend.state.store.RoomStateStore;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import com.lol.backend.state.dto.RoomHostHistoryStateDto;
@@ -43,6 +45,7 @@ public class RoomService {
     private final RoomStateStore roomStateStore;
     private final GameStateStore gameStateStore;
     private final SnapshotWriter snapshotWriter;
+    private final GameService gameService;
 
     // ========== 1. getRooms ==========
     public PagedRoomListResponse getRooms(UUID currentUserId,
@@ -458,14 +461,37 @@ public class RoomService {
         );
         roomStateStore.saveRoom(updatedRoom);
 
+        // 동기 stage 전이: LOBBY → 첫 stage (SSOT: ROOM_GAME_STARTED.stage에 LOBBY 불가)
+        GameStage firstStage = (GameType.valueOf(roomState.gameType()) == GameType.RANKED)
+                ? GameStage.BAN : GameStage.PLAY;
+        gameService.transitionStage(game.getId(), firstStage);
+
+        // Redis에서 갱신된 상태 조회
+        GameStateDto updatedGame = gameStateStore.getGame(game.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
+
+        // ROOM_LIST_REMOVED 이벤트 발행
         roomStateStore.incrementListVersion();
         long listVersion = roomStateStore.getListVersion();
         eventPublisher.roomListRemoved(roomId, listVersion, "GAME_STARTED");
-        eventPublisher.gameStarted(roomId, game.getId());
 
-        // 게임은 LOBBY 상태로 생성되며, GameStageScheduler가 1초 이내에 첫 stage(BAN/PLAY)로 자동 전이
+        // ROOM_GAME_STARTED 이벤트 발행 → 대기실 클라이언트가 game 토픽 구독 전환
+        String pageRoute = ActiveGameResponse.from(updatedGame).pageRoute();
+        long remainingMs = (updatedGame.stageDeadlineAt() != null)
+                ? Math.max(0, updatedGame.stageDeadlineAt().toEpochMilli() - Instant.now().toEpochMilli())
+                : 0L;
+        eventPublisher.roomGameStarted(
+                roomId,
+                game.getId(),
+                updatedGame.gameType(),
+                updatedGame.stage(),
+                pageRoute,
+                updatedGame.stageStartedAt() != null ? updatedGame.stageStartedAt().toString() : null,
+                updatedGame.stageDeadlineAt() != null ? updatedGame.stageDeadlineAt().toString() : null,
+                remainingMs
+        );
 
-        return ActiveGameResponse.from(game);
+        return ActiveGameResponse.from(updatedGame);
     }
 
     // ========== 9. kickPlayer ==========

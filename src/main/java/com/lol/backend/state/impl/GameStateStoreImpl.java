@@ -1,11 +1,11 @@
-package com.lol.backend.modules.game.state;
+package com.lol.backend.state.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lol.backend.state.GameStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
+import com.lol.backend.state.store.GameStateStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -59,11 +59,14 @@ public class GameStateStoreImpl implements GameStateStore {
 
     @Override
     public void deleteGame(UUID gameId) {
-        String gameKey = RedisKeyBuilder.game(gameId);
-        String playersKey = RedisKeyBuilder.gamePlayers(gameId);
-        redisTemplate.delete(gameKey);
-        redisTemplate.delete(playersKey);
-        log.debug("Deleted game state: gameId={}", gameId);
+        redisTemplate.delete(RedisKeyBuilder.game(gameId));
+        redisTemplate.delete(RedisKeyBuilder.gamePlayers(gameId));
+        redisTemplate.delete(RedisKeyBuilder.gameBans(gameId));
+        redisTemplate.delete(RedisKeyBuilder.gamePicks(gameId));
+        redisTemplate.delete(RedisKeyBuilder.gamePurchasesItems(gameId));
+        redisTemplate.delete(RedisKeyBuilder.gamePurchasesSpells(gameId));
+        redisTemplate.delete(RedisKeyBuilder.effectsActive(gameId));
+        log.debug("Deleted game state and all associated keys: gameId={}", gameId);
     }
 
     @Override

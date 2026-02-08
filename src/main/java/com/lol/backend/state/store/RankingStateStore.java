@@ -1,4 +1,4 @@
-package com.lol.backend.state;
+package com.lol.backend.state.store;
 
 import java.util.List;
 import java.util.UUID;

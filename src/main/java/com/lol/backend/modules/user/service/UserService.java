@@ -14,7 +14,7 @@ import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.user.dto.*;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;

@@ -1,13 +1,13 @@
-package com.lol.backend.modules.room.state;
+package com.lol.backend.state.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lol.backend.state.RedisKeyBuilder;
-import com.lol.backend.state.RoomStateStore;
 import com.lol.backend.state.dto.RoomHostHistoryStateDto;
 import com.lol.backend.state.dto.RoomKickStateDto;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import com.lol.backend.state.dto.RoomStateDto;
+import com.lol.backend.state.store.RoomStateStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.core.RedisTemplate;

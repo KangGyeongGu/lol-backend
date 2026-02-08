@@ -1,7 +1,7 @@
 package com.lol.backend.state.impl;
 
-import com.lol.backend.state.RankingStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
+import com.lol.backend.state.store.RankingStateStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;

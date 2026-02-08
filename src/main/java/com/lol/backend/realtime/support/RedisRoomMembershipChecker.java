@@ -1,6 +1,6 @@
 package com.lol.backend.realtime.support;
 
-import com.lol.backend.state.RoomStateStore;
+import com.lol.backend.state.store.RoomStateStore;
 import com.lol.backend.state.dto.RoomPlayerStateDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

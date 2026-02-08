@@ -1,4 +1,4 @@
-package com.lol.backend.state;
+package com.lol.backend.state.store;
 
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;

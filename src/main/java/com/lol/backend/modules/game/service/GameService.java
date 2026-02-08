@@ -3,14 +3,15 @@ package com.lol.backend.modules.game.service;
 import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.common.util.SecurityUtil;
+import com.lol.backend.modules.game.config.GameStageProperties;
 import com.lol.backend.modules.game.dto.*;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.shop.service.GameInventoryService;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.GameStateStore;
-import com.lol.backend.state.SnapshotWriter;
+import com.lol.backend.state.store.GameStateStore;
+import com.lol.backend.state.snapshot.SnapshotWriter;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class GameService {
     private final GameInventoryService gameInventoryService;
     private final SnapshotWriter snapshotWriter;
     private final com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository;
+    private final GameStageProperties stageProperties;
 
     /**
      * 게임 상태를 조회한다.
@@ -374,12 +376,11 @@ public class GameService {
      * stage별 deadline을 계산한다.
      */
     private Instant calculateStageDeadline(GameStage stage, Instant startedAt) {
-        // 각 stage별 제한 시간 (초)
         long durationSeconds = switch (stage) {
-            case BAN -> 60; // 1분
-            case PICK -> 60; // 1분
-            case SHOP -> 120; // 2분
-            case PLAY -> 3600; // 60분
+            case BAN -> stageProperties.ban();
+            case PICK -> stageProperties.pick();
+            case SHOP -> stageProperties.shop();
+            case PLAY -> stageProperties.play();
             default -> 0; // LOBBY, FINISHED는 deadline 없음
         };
 
