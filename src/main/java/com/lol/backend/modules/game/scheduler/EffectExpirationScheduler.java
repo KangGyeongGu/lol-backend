@@ -1,9 +1,9 @@
-package com.lol.backend.realtime.scheduler;
+package com.lol.backend.modules.game.scheduler;
 
 import com.lol.backend.realtime.dto.EventType;
 import com.lol.backend.realtime.support.EventPublisher;
-import com.lol.backend.state.EphemeralStateStore;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.store.EphemeralStateStore;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

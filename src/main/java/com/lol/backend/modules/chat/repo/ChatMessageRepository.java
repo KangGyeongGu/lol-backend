@@ -1,4 +1,4 @@
-package com.lol.backend.modules.chat.repository;
+package com.lol.backend.modules.chat.repo;
 
 import com.lol.backend.modules.chat.entity.ChatMessage;
 import org.springframework.data.jpa.repository.JpaRepository;
