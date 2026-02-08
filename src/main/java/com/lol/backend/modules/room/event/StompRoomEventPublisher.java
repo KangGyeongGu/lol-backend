@@ -22,6 +22,7 @@ public class StompRoomEventPublisher implements RoomEventPublisher {
 
     private static final String TOPIC_ROOM_LIST = "/topic/rooms/list";
     private static final String TOPIC_ROOM_LOBBY = "/topic/rooms/%s/lobby";
+    private static final String TOPIC_GAME = "/topic/games/%s";
     private static final String QUEUE_ROOMS = "/queue/rooms";
 
     private final EventPublisher eventPublisher;
@@ -82,13 +83,60 @@ public class StompRoomEventPublisher implements RoomEventPublisher {
     }
 
     @Override
+    @Deprecated
     public void gameStarted(UUID roomId, UUID gameId) {
-        var data = Map.of("roomId", roomId.toString(), "gameId", gameId.toString(), "stage", "BAN_PICK");
-        eventPublisher.broadcast(lobbyTopic(roomId), EventType.GAME_STAGE_CHANGED, data);
-        log.debug("gameStarted: roomId={}, gameId={}", roomId, gameId);
+        log.warn("gameStarted() is deprecated. Use gameStageChanged() instead. roomId={}, gameId={}", roomId, gameId);
+        // 하위 호환성 유지: 게임 시작 시 LOBBY stage로 알림 (실제로는 gameStageChanged 호출 권장)
+        gameStageChanged(gameId, roomId, "RANKED", "LOBBY", null, null, 0L);
+    }
+
+    @Override
+    public void gameStageChanged(UUID gameId, UUID roomId, String gameType, String stage,
+                                 String stageStartedAt, String stageDeadlineAt, long remainingMs) {
+        var data = new GameStageChangedEventData(
+                gameId.toString(),
+                roomId.toString(),
+                gameType,
+                stage,
+                stageStartedAt,
+                stageDeadlineAt,
+                remainingMs
+        );
+        eventPublisher.broadcast(gameTopic(gameId), EventType.GAME_STAGE_CHANGED, data);
+        log.debug("gameStageChanged: gameId={}, stage={}, remainingMs={}", gameId, stage, remainingMs);
+    }
+
+    @Override
+    public void gameFinished(UUID gameId, UUID roomId, String finishedAt, java.util.List<RoomEventPublisher.GameFinishedResultData> results) {
+        var resultList = results.stream()
+                .map(r -> new GameFinishedEventData.GameResultData(
+                        r.userId().toString(),
+                        r.nickname(),
+                        r.result(),
+                        r.rankInGame(),
+                        r.scoreDelta(),
+                        r.coinDelta(),
+                        r.expDelta(),
+                        r.finalScoreValue(),
+                        r.solved()
+                ))
+                .toList();
+
+        var data = new GameFinishedEventData(
+                gameId.toString(),
+                roomId.toString(),
+                finishedAt,
+                resultList
+        );
+        eventPublisher.broadcast(gameTopic(gameId), EventType.GAME_FINISHED, data);
+        log.debug("gameFinished: gameId={}, resultsCount={}", gameId, results.size());
     }
 
     private String lobbyTopic(UUID roomId) {
         return String.format(TOPIC_ROOM_LOBBY, roomId);
+    }
+
+    private String gameTopic(UUID gameId) {
+        return String.format(TOPIC_GAME, gameId);
     }
 }

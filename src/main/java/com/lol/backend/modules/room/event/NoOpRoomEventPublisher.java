@@ -61,4 +61,15 @@ public class NoOpRoomEventPublisher implements RoomEventPublisher {
     public void gameStarted(UUID roomId, UUID gameId) {
         log.debug("[NoOp] gameStarted: roomId={}, gameId={}", roomId, gameId);
     }
+
+    @Override
+    public void gameStageChanged(UUID gameId, UUID roomId, String gameType, String stage,
+                                 String stageStartedAt, String stageDeadlineAt, long remainingMs) {
+        log.debug("[NoOp] gameStageChanged: gameId={}, stage={}, remainingMs={}", gameId, stage, remainingMs);
+    }
+
+    @Override
+    public void gameFinished(UUID gameId, UUID roomId, String finishedAt, java.util.List<RoomEventPublisher.GameFinishedResultData> results) {
+        log.debug("[NoOp] gameFinished: gameId={}, resultsCount={}", gameId, results.size());
+    }
 }
