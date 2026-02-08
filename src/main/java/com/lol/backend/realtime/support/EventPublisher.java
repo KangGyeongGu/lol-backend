@@ -33,6 +33,21 @@ public class EventPublisher {
     }
 
     /**
+     * 특정 topic으로 이벤트를 브로드캐스트한다.
+     * SSOT 계약 준수: meta.serverTime을 지정된 Instant로 생성한다.
+     *
+     * @param topic 대상 topic
+     * @param type 이벤트 타입
+     * @param data 이벤트 데이터
+     * @param serverTime 서버 시간 (Instant)
+     */
+    public <T> void broadcast(String topic, EventType type, T data, java.time.Instant serverTime) {
+        EventEnvelope<T> envelope = EventEnvelope.of(type, data, serverTime);
+        log.debug("Broadcasting {} to {} with serverTime={}", type, topic, serverTime.toString());
+        messagingTemplate.convertAndSend(topic, envelope);
+    }
+
+    /**
      * 특정 사용자의 queue로 이벤트를 전송한다.
      */
     public <T> void sendToUser(String userId, String destination, EventType type, T data) {

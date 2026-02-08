@@ -6,6 +6,7 @@ package com.lol.backend.realtime.dto;
  */
 public enum EventType {
     ERROR,
+    TIME_SYNC,
     CHAT_MESSAGE,
     ROOM_LIST_UPSERT,
     ROOM_LIST_REMOVED,
@@ -15,6 +16,11 @@ public enum EventType {
     ROOM_HOST_CHANGED,
     ROOM_KICKED,
     GAME_STAGE_CHANGED,
+    ROOM_GAME_STARTED,
+    GAME_BAN_SUBMITTED,
+    GAME_PICK_SUBMITTED,
+    GAME_ITEM_PURCHASED,
+    GAME_SPELL_PURCHASED,
     GAME_FINISHED,
     TYPING_STATUS_CHANGED,
     ITEM_EFFECT_APPLIED,

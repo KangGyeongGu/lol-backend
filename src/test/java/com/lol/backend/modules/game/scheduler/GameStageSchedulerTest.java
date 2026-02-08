@@ -3,7 +3,7 @@ package com.lol.backend.modules.game.scheduler;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.service.GameService;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.GameStateDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
