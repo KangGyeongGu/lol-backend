@@ -14,13 +14,15 @@ import com.lol.backend.modules.shop.repo.GameItemPurchaseRepository;
 import com.lol.backend.modules.shop.repo.GameSpellPurchaseRepository;
 import com.lol.backend.modules.shop.repo.ItemRepository;
 import com.lol.backend.modules.shop.repo.SpellRepository;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.modules.game.event.GameEventPublisher;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -37,6 +39,7 @@ public class ShopService {
     private final GameSpellPurchaseRepository gameSpellPurchaseRepository;
     private final BanPickService banPickService;
     private final GameInventoryService gameInventoryService;
+    private final GameEventPublisher gameEventPublisher;
 
     @Transactional
     public GameStateResponse purchaseItem(UUID gameId, UUID userId, ShopItemRequest request) {
@@ -69,8 +72,13 @@ public class ShopService {
         }
 
         // 구매 기록 생성 (write-through: 즉시 DB 저장)
+        Instant purchasedAt = Instant.now();
         GameItemPurchase purchase = new GameItemPurchase(gameId, userId, itemId, request.quantity(), item.getPrice(), totalCost);
         gameItemPurchaseRepository.save(purchase);
+
+        // 실시간 이벤트 발행 (SSOT EVENTS.md 5.4)
+        gameEventPublisher.gameItemPurchased(gameId, game.roomId(), userId, itemId,
+                request.quantity(), item.getPrice(), totalCost, purchasedAt.toString());
 
         return banPickService.getGameState(gameId, userId);
     }
@@ -106,8 +114,13 @@ public class ShopService {
         }
 
         // 구매 기록 생성 (write-through: 즉시 DB 저장)
+        Instant purchasedAt = Instant.now();
         GameSpellPurchase purchase = new GameSpellPurchase(gameId, userId, spellId, request.quantity(), spell.getPrice(), totalCost);
         gameSpellPurchaseRepository.save(purchase);
+
+        // 실시간 이벤트 발행 (SSOT EVENTS.md 5.5)
+        gameEventPublisher.gameSpellPurchased(gameId, game.roomId(), userId, spellId,
+                request.quantity(), spell.getPrice(), totalCost, purchasedAt.toString());
 
         return banPickService.getGameState(gameId, userId);
     }

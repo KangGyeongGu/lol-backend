@@ -1,4 +1,4 @@
-package com.lol.backend.modules.room.dto;
+package com.lol.backend.modules.room.event.dto;
 
 /**
  * ROOM_PLAYER_LEFT 이벤트 데이터.

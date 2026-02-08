@@ -1,4 +1,4 @@
-package com.lol.backend.modules.room.dto;
+package com.lol.backend.modules.game.event.dto;
 
 import java.util.List;
 

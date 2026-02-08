@@ -86,55 +86,19 @@ public interface RoomEventPublisher {
     void playerKicked(UUID roomId, UUID kickedUserId, UUID kickedByUserId, String kickedAt);
 
     /**
-     * GAME_STAGE_CHANGED (game started): /topic/rooms/{roomId}/lobby
-     * 게임 시작 시 호출.
+     * ROOM_GAME_STARTED: /topic/rooms/{roomId}/lobby
+     * 게임 시작 시 호출 (SSOT EVENTS.md 5.6 기준).
+     * 대기실 클라이언트에게 gameId를 전달하여 /topic/games/{gameId} 구독 전환을 트리거한다.
      *
      * @param roomId 룸 ID
      * @param gameId 게임 ID
-     * @deprecated Use {@link #gameStageChanged} instead for SSOT compliance
-     */
-    @Deprecated
-    void gameStarted(UUID roomId, UUID gameId);
-
-    /**
-     * GAME_STAGE_CHANGED: /topic/games/{gameId}
-     * 게임 stage 전이 시 호출 (SSOT EVENTS.md 5.1 기준).
-     *
-     * @param gameId 게임 ID
-     * @param roomId 룸 ID
      * @param gameType 게임 타입 (NORMAL, RANKED)
-     * @param stage 현재 stage (LOBBY, BAN, PICK, SHOP, PLAY, FINISHED)
+     * @param stage 첫 stage (BAN, PLAY 등 — LOBBY 제외)
+     * @param pageRoute 페이지 라우트 (BAN_PICK_SHOP, IN_GAME)
      * @param stageStartedAt stage 시작 시각 (ISO-8601)
-     * @param stageDeadlineAt stage 마감 시각 (ISO-8601, null 가능)
+     * @param stageDeadlineAt stage 마감 시각 (ISO-8601)
      * @param remainingMs 남은 시간(ms)
      */
-    void gameStageChanged(UUID gameId, UUID roomId, String gameType, String stage,
-                          String stageStartedAt, String stageDeadlineAt, long remainingMs);
-
-    /**
-     * GAME_FINISHED: /topic/games/{gameId}
-     * 게임 종료 시 호출 (SSOT EVENTS.md 5.2 기준).
-     *
-     * @param gameId 게임 ID
-     * @param roomId 룸 ID
-     * @param finishedAt 종료 시각 (ISO-8601)
-     * @param results 게임 결과 목록 (userId → nickname, result, rank, deltas 등)
-     */
-    void gameFinished(UUID gameId, UUID roomId, String finishedAt, java.util.List<GameFinishedResultData> results);
-
-    /**
-     * 게임 결과 개별 플레이어 데이터.
-     */
-    record GameFinishedResultData(
-            UUID userId,
-            String nickname,
-            String result,
-            int rankInGame,
-            int scoreDelta,
-            int coinDelta,
-            double expDelta,
-            int finalScoreValue,
-            boolean solved
-    ) {
-    }
+    void roomGameStarted(UUID roomId, UUID gameId, String gameType, String stage,
+                         String pageRoute, String stageStartedAt, String stageDeadlineAt, long remainingMs);
 }

@@ -2,11 +2,11 @@ package com.lol.backend.modules.game.scheduler;
 
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
+import com.lol.backend.modules.game.event.GameEventPublisher;
 import com.lol.backend.modules.game.service.GameService;
-import com.lol.backend.modules.room.event.RoomEventPublisher;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class GameStageScheduler {
 
     private final GameStateStore gameStateStore;
     private final GameService gameService;
-    private final RoomEventPublisher roomEventPublisher;
+    private final GameEventPublisher gameEventPublisher;
     private final UserRepository userRepository;
 
     /**
@@ -151,6 +151,7 @@ public class GameStageScheduler {
 
     /**
      * GAME_STAGE_CHANGED 이벤트를 발행한다.
+     * SSOT 계약 준수: remainingMs와 meta.serverTime을 동일 Instant 기반으로 계산한다.
      *
      * @param gameId 게임 ID
      */
@@ -162,18 +163,22 @@ public class GameStageScheduler {
                 return;
             }
 
+            // SSOT 계약 준수: remainingMs와 meta.serverTime을 동일 Instant에서 계산
+            Instant now = Instant.now();
+
             String stageStartedAt = formatInstant(game.stageStartedAt());
             String stageDeadlineAt = formatInstant(game.stageDeadlineAt());
-            long remainingMs = calculateRemainingMs(game);
+            long remainingMs = calculateRemainingMs(game, now);
 
-            roomEventPublisher.gameStageChanged(
+            gameEventPublisher.gameStageChanged(
                     game.id(),
                     game.roomId(),
                     game.gameType(),
                     game.stage(),
                     stageStartedAt,
                     stageDeadlineAt,
-                    remainingMs
+                    remainingMs,
+                    now
             );
         } catch (Exception e) {
             log.error("Failed to publish GAME_STAGE_CHANGED event: gameId={}", gameId, e);
@@ -196,12 +201,12 @@ public class GameStageScheduler {
             List<GamePlayerStateDto> players = gameStateStore.getGamePlayers(gameId);
 
             // GamePlayerStateDto → GameFinishedResultData 변환 (닉네임 조회 포함)
-            List<RoomEventPublisher.GameFinishedResultData> results = players.stream()
+            List<GameEventPublisher.GameFinishedResultData> results = players.stream()
                     .map(gp -> {
                         User user = userRepository.findById(gp.userId()).orElse(null);
                         String nickname = (user != null) ? user.getNickname() : "Unknown";
 
-                        return new RoomEventPublisher.GameFinishedResultData(
+                        return new GameEventPublisher.GameFinishedResultData(
                                 gp.userId(),
                                 nickname,
                                 gp.result() != null ? gp.result() : "DRAW",
@@ -216,7 +221,7 @@ public class GameStageScheduler {
                     .toList();
 
             String finishedAt = formatInstant(game.finishedAt());
-            roomEventPublisher.gameFinished(game.id(), game.roomId(), finishedAt, results);
+            gameEventPublisher.gameFinished(game.id(), game.roomId(), finishedAt, results);
         } catch (Exception e) {
             log.error("Failed to publish GAME_FINISHED event: gameId={}", gameId, e);
         }
@@ -234,15 +239,16 @@ public class GameStageScheduler {
 
     /**
      * 게임의 남은 시간(ms)을 계산한다.
+     * SSOT 계약 준수: meta.serverTime과 동일 Instant를 사용한다.
      *
      * @param game 게임 상태
+     * @param now 기준 시각 (Instant)
      * @return 남은 시간(ms), deadline이 없거나 지난 경우 0
      */
-    private long calculateRemainingMs(GameStateDto game) {
+    private long calculateRemainingMs(GameStateDto game, Instant now) {
         if (game.stageDeadlineAt() == null) {
             return 0L;
         }
-        Instant now = Instant.now();
         long remaining = game.stageDeadlineAt().toEpochMilli() - now.toEpochMilli();
         return Math.max(0L, remaining);
     }

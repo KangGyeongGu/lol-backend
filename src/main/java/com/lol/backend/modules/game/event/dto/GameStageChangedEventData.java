@@ -1,4 +1,4 @@
-package com.lol.backend.modules.room.dto;
+package com.lol.backend.modules.game.event.dto;
 
 /**
  * GAME_STAGE_CHANGED 이벤트 payload (SSOT EVENTS.md 5.1 기준).

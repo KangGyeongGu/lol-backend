@@ -11,8 +11,9 @@ import com.lol.backend.modules.shop.dto.BanPickRequest;
 import com.lol.backend.modules.shop.repo.AlgorithmRepository;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
-import com.lol.backend.state.BanPickStateStore;
-import com.lol.backend.state.GameStateStore;
+import com.lol.backend.modules.game.event.GameEventPublisher;
+import com.lol.backend.state.store.BanPickStateStore;
+import com.lol.backend.state.store.GameStateStore;
 import com.lol.backend.state.dto.GameBanDto;
 import com.lol.backend.state.dto.GamePickDto;
 import com.lol.backend.state.dto.GamePlayerStateDto;
@@ -35,6 +36,7 @@ public class BanPickService {
     private final AlgorithmRepository algorithmRepository;
     private final BanPickStateStore banPickStateStore;
     private final GameInventoryService gameInventoryService;
+    private final GameEventPublisher gameEventPublisher;
 
     @Transactional(readOnly = true)
     public GameStateResponse getGameState(UUID gameId, UUID userId) {
@@ -106,8 +108,12 @@ public class BanPickService {
         }
 
         // Redis에 밴 저장 (write-back)
-        GameBanDto gameBan = new GameBanDto(UUID.randomUUID(), gameId, userId, algorithmId, Instant.now());
+        Instant submittedAt = Instant.now();
+        GameBanDto gameBan = new GameBanDto(UUID.randomUUID(), gameId, userId, algorithmId, submittedAt);
         banPickStateStore.saveBan(gameBan);
+
+        // 실시간 이벤트 발행 (SSOT EVENTS.md 5.2)
+        gameEventPublisher.gameBanSubmitted(gameId, game.roomId(), userId, algorithmId, submittedAt.toString());
 
         return getGameState(gameId, userId);
     }
@@ -133,8 +139,12 @@ public class BanPickService {
         }
 
         // Redis에 픽 저장 (write-back)
-        GamePickDto gamePick = new GamePickDto(UUID.randomUUID(), gameId, userId, algorithmId, Instant.now());
+        Instant submittedAt = Instant.now();
+        GamePickDto gamePick = new GamePickDto(UUID.randomUUID(), gameId, userId, algorithmId, submittedAt);
         banPickStateStore.savePick(gamePick);
+
+        // 실시간 이벤트 발행 (SSOT EVENTS.md 5.3)
+        gameEventPublisher.gamePickSubmitted(gameId, game.roomId(), userId, algorithmId, submittedAt.toString());
 
         return getGameState(gameId, userId);
     }

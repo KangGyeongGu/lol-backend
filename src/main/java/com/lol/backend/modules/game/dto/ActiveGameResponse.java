@@ -3,6 +3,7 @@ package com.lol.backend.modules.game.dto;
 import com.lol.backend.modules.game.entity.Game;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
+import com.lol.backend.state.dto.GameStateDto;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -25,6 +26,23 @@ public record ActiveGameResponse(
                 game.getStage(),
                 pageRoute,
                 game.getGameType(),
+                remainingMs
+        );
+    }
+
+    public static ActiveGameResponse from(GameStateDto game) {
+        GameStage stage = GameStage.valueOf(game.stage());
+        String pageRoute = resolvePageRoute(stage);
+        Integer remainingMs = (game.stageDeadlineAt() != null)
+                ? (int) Math.max(0, Duration.between(Instant.now(), game.stageDeadlineAt()).toMillis())
+                : null;
+
+        return new ActiveGameResponse(
+                game.id().toString(),
+                game.roomId().toString(),
+                stage,
+                pageRoute,
+                GameType.valueOf(game.gameType()),
                 remainingMs
         );
     }

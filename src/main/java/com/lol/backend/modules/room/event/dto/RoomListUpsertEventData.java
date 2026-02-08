@@ -1,4 +1,6 @@
-package com.lol.backend.modules.room.dto;
+package com.lol.backend.modules.room.event.dto;
+
+import com.lol.backend.modules.room.dto.RoomSummaryResponse;
 
 /**
  * ROOM_LIST_UPSERT 이벤트 데이터.
