@@ -41,6 +41,11 @@ game:
     pick: 10
     shop: 10
     play: 10
+  # 게임 SHOP 설정 (ECONOMY.md 1.2절, GAME_RULES.md 5.1절)
+  shop:
+    initial-coin: 3000    # 인게임 SHOP 단계 초기 코인
+    max-item-count: 3     # 아이템 최대 구매 수량
+    max-spell-count: 2    # 스펠 최대 구매 수량
 
 # 로깅 설정
 logging:
