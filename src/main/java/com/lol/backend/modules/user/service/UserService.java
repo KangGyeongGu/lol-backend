@@ -11,6 +11,8 @@ import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.entity.MatchResult;
 import com.lol.backend.modules.game.repo.GamePlayerRepository;
 import com.lol.backend.modules.game.repo.GameRepository;
+import com.lol.backend.modules.room.entity.Room;
+import com.lol.backend.modules.room.repo.RoomRepository;
 import com.lol.backend.modules.user.dto.*;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
@@ -35,6 +37,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final GameRepository gameRepository;
     private final GamePlayerRepository gamePlayerRepository;
+    private final RoomRepository roomRepository;
     private final GameStateStore gameStateStore;
 
     public UserProfileResponse getMyProfile(String userId) {
@@ -148,11 +151,22 @@ public class UserService {
                 continue;
             }
 
+            Room room = roomRepository.findById(game.getRoomId()).orElse(null);
+            if (room == null) {
+                continue;
+            }
+
+            // finalPlayers: 게임 종료 시점 플레이어 수 (result가 있는 플레이어 수)
+            int finalPlayers = (int) gamePlayerRepository.findByGameId(gp.getGameId()).stream()
+                    .filter(p -> p.getResult() != null)
+                    .count();
+
             matches.add(new MatchSummaryResponse(
                     gp.getGameId().toString(),
+                    room.getRoomName(),
                     game.getGameType().name(),
                     gp.getResult().name(),
-                    gp.getScoreDelta() != null ? gp.getScoreDelta() : 0,
+                    finalPlayers,
                     gp.getJoinedAt().toString()
             ));
         }
