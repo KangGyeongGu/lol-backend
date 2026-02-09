@@ -10,6 +10,9 @@ public record ItemSummaryResponse(
     @JsonProperty("name")
     String name,
 
+    @JsonProperty("iconKey")
+    String iconKey,
+
     @JsonProperty("description")
     String description,
 
@@ -23,6 +26,7 @@ public record ItemSummaryResponse(
         return new ItemSummaryResponse(
             item.getId().toString(),
             item.getName(),
+            item.getIconKey(),
             item.getDescription(),
             item.getDurationSec(),
             item.getPrice()

@@ -30,17 +30,21 @@ public class Item {
     @Column(nullable = false)
     private int price;
 
+    @Column(name = "icon_key", length = 100)
+    private String iconKey;
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public Item(String name, String description, int durationSec, int price, boolean isActive) {
+    public Item(String name, String description, int durationSec, int price, String iconKey, boolean isActive) {
         this.name = name;
         this.description = description;
         this.durationSec = durationSec;
         this.price = price;
+        this.iconKey = iconKey;
         this.isActive = isActive;
     }
 

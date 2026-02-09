@@ -10,6 +10,9 @@ public record SpellSummaryResponse(
     @JsonProperty("name")
     String name,
 
+    @JsonProperty("iconKey")
+    String iconKey,
+
     @JsonProperty("description")
     String description,
 
@@ -23,6 +26,7 @@ public record SpellSummaryResponse(
         return new SpellSummaryResponse(
             spell.getId().toString(),
             spell.getName(),
+            spell.getIconKey(),
             spell.getDescription(),
             spell.getDurationSec(),
             spell.getPrice()
