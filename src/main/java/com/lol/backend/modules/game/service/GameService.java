@@ -370,6 +370,12 @@ public class GameService {
 
             GamePlayerStateDto player = pr.player;
 
+            // User 조회하여 coinBefore, expBefore 설정
+            User user = userRepository.findById(player.userId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "사용자를 찾을 수 없습니다"));
+            int coinBefore = user.getCoin();
+            double expBefore = user.getExp();
+
             GamePlayerStateDto updatedPlayer = new GamePlayerStateDto(
                     player.id(),
                     player.gameId(),
@@ -382,7 +388,9 @@ public class GameService {
                     currentRank,
                     solved,
                     result,
+                    coinBefore,
                     coinDelta,
+                    expBefore,
                     expDelta,
                     player.joinedAt(),
                     player.leftAt(),

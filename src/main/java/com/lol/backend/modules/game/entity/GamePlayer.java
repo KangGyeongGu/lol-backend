@@ -58,9 +58,15 @@ public class GamePlayer {
     @Column(length = 10)
     private MatchResult result;
 
+    @Column(name = "coin_before")
+    private Integer coinBefore;
+
     @Setter
     @Column(name = "coin_delta")
     private Integer coinDelta;
+
+    @Column(name = "exp_before")
+    private Double expBefore;
 
     @Setter
     @Column(name = "exp_delta")
@@ -77,11 +83,13 @@ public class GamePlayer {
     @Column(name = "disconnected_at")
     private Instant disconnectedAt;
 
-    public GamePlayer(UUID gameId, UUID userId, int scoreBefore) {
+    public GamePlayer(UUID gameId, UUID userId, int scoreBefore, int coinBefore, double expBefore) {
         this.gameId = gameId;
         this.userId = userId;
         this.state = GamePlayerState.CONNECTED;
         this.scoreBefore = scoreBefore;
+        this.coinBefore = coinBefore;
+        this.expBefore = expBefore;
     }
 
     @PrePersist

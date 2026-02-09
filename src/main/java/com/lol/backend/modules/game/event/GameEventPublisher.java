@@ -117,7 +117,9 @@ public interface GameEventPublisher {
             String result,
             int rankInGame,
             int scoreDelta,
+            int coinBefore,
             int coinDelta,
+            double expBefore,
             double expDelta,
             int finalScoreValue,
             boolean solved

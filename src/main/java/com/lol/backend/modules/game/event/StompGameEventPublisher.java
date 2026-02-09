@@ -134,7 +134,9 @@ public class StompGameEventPublisher implements GameEventPublisher {
                         r.result(),
                         r.rankInGame(),
                         r.scoreDelta(),
+                        r.coinBefore(),
                         r.coinDelta(),
+                        r.expBefore(),
                         r.expDelta(),
                         r.finalScoreValue(),
                         r.solved()

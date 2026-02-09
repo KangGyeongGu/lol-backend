@@ -421,7 +421,7 @@ public class RoomService {
 
         for (RoomPlayerStateDto rp : activePlayers) {
             User player = findUserOrThrow(rp.userId());
-            GamePlayer gp = new GamePlayer(game.getId(), player.getId(), player.getScore());
+            GamePlayer gp = new GamePlayer(game.getId(), player.getId(), player.getScore(), player.getCoin(), player.getExp());
             gamePlayerRepository.save(gp);
 
             // Redis에 GamePlayer 상태 저장
@@ -437,7 +437,9 @@ public class RoomService {
                     gp.getRankInGame(),
                     gp.getSolved(),
                     gp.getResult() != null ? gp.getResult().name() : null,
+                    gp.getCoinBefore(),
                     gp.getCoinDelta(),
+                    gp.getExpBefore(),
                     gp.getExpDelta(),
                     gp.getJoinedAt(),
                     gp.getLeftAt(),

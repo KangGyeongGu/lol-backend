@@ -25,7 +25,9 @@ public record GameFinishedEventData(
      * @param result 게임 결과 (WIN, LOSE, DRAW)
      * @param rankInGame 게임 내 순위
      * @param scoreDelta 점수 변동
+     * @param coinBefore 코인 변경 전 값
      * @param coinDelta 코인 변동
+     * @param expBefore 경험치 변경 전 값
      * @param expDelta 경험치 변동
      * @param finalScoreValue 최종 점수
      * @param solved 문제 해결 여부
@@ -36,7 +38,9 @@ public record GameFinishedEventData(
             String result,
             int rankInGame,
             int scoreDelta,
+            int coinBefore,
             int coinDelta,
+            double expBefore,
             double expDelta,
             int finalScoreValue,
             boolean solved

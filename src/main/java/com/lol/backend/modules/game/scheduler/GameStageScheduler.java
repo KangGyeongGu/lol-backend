@@ -255,7 +255,9 @@ public class GameStageScheduler {
                                     gp.result() != null ? gp.result() : "DRAW",
                                     gp.rankInGame() != null ? gp.rankInGame() : 0,
                                     gp.scoreDelta() != null ? gp.scoreDelta() : 0,
+                                    gp.coinBefore() != null ? gp.coinBefore() : 0,
                                     gp.coinDelta() != null ? gp.coinDelta() : 0,
+                                    gp.expBefore() != null ? gp.expBefore() : 0.0,
                                     gp.expDelta() != null ? gp.expDelta() : 0.0,
                                     gp.finalScoreValue() != null ? gp.finalScoreValue() : 0,
                                     gp.solved() != null ? gp.solved() : false
@@ -288,7 +290,9 @@ public class GameStageScheduler {
                                 gp.getResult() != null ? gp.getResult().name() : "DRAW",
                                 gp.getRankInGame() != null ? gp.getRankInGame() : 0,
                                 gp.getScoreDelta() != null ? gp.getScoreDelta() : 0,
+                                gp.getCoinBefore() != null ? gp.getCoinBefore() : 0,
                                 gp.getCoinDelta() != null ? gp.getCoinDelta() : 0,
+                                gp.getExpBefore() != null ? gp.getExpBefore() : 0.0,
                                 gp.getExpDelta() != null ? gp.getExpDelta() : 0.0,
                                 gp.getFinalScoreValue() != null ? gp.getFinalScoreValue() : 0,
                                 gp.getSolved() != null ? gp.getSolved() : false
