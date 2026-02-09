@@ -7,13 +7,15 @@ import com.lol.backend.modules.game.config.GameStageProperties;
 import com.lol.backend.modules.game.dto.*;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
-import com.lol.backend.modules.shop.service.GameInventoryService;
+import com.lol.backend.modules.game.service.GameInventoryService;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.store.GameStateStore;
+import com.lol.backend.state.store.RoomStateStore;
 import com.lol.backend.state.snapshot.SnapshotWriter;
 import com.lol.backend.state.dto.GamePlayerStateDto;
 import com.lol.backend.state.dto.GameStateDto;
+import com.lol.backend.state.dto.RoomStateDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -33,11 +36,13 @@ import java.util.UUID;
 public class GameService {
 
     private final GameStateStore gameStateStore;
+    private final RoomStateStore roomStateStore;
     private final UserRepository userRepository;
     private final GameInventoryService gameInventoryService;
     private final SnapshotWriter snapshotWriter;
     private final com.lol.backend.modules.game.repo.SubmissionRepository submissionRepository;
     private final GameStageProperties stageProperties;
+    private final com.lol.backend.modules.room.event.RoomEventPublisher roomEventPublisher;
 
     /**
      * 게임 상태를 조회한다.
@@ -162,9 +167,10 @@ public class GameService {
     /**
      * 게임을 종료한다.
      * @param gameId 게임 ID
+     * @return 이벤트 발행용 종료 정보 (스케줄러가 사용)
      */
     @Transactional
-    public void finishGame(UUID gameId) {
+    public GameStateDto finishGame(UUID gameId) {
         GameStateDto game = gameStateStore.getGame(gameId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.GAME_NOT_FOUND));
 
@@ -191,13 +197,47 @@ public class GameService {
         // 게임 결과 계산 및 GamePlayer 상태 갱신
         calculateAndSaveGameResults(gameId);
 
+        // 방 삭제 (Redis) 및 ROOM_LIST_REMOVED 이벤트 발행
+        // SSOT: 게임 종료 후 방은 목록에서 제거되며, 사용자는 RESULT → MAIN/MY_PAGE로 이동
+        UUID roomId = game.roomId();
+        Optional<RoomStateDto> roomStateOpt = roomStateStore.getRoom(roomId);
+        if (roomStateOpt.isPresent()) {
+            // ROOM_LIST_REMOVED 이벤트 발행 (방 삭제 전에 발행)
+            long listVersion = roomStateStore.getListVersion();
+            roomStateStore.incrementListVersion();
+            roomEventPublisher.roomListRemoved(roomId, listVersion + 1, "ROOM_CLOSED");
+
+            // 방 삭제 (Redis에서 room, players, kicks, hostHistory 모두 제거)
+            roomStateStore.deleteRoom(roomId);
+            log.info("Room deleted after game finish: roomId={}, gameId={}", roomId, gameId);
+        } else {
+            log.warn("Room not found when deleting: roomId={}, gameId={}", roomId, gameId);
+        }
+
+        // 이벤트 발행은 호출자(스케줄러)에서 처리 (flushGame() 전에 발행해야 Redis 데이터 접근 가능)
+
         // DB 스냅샷 반영 (USER.active_game_id 해제, 정산 포함)
         snapshotWriter.flushGame(gameId);
+
+        return finishedGame;
     }
+
+    // ECONOMY.md 1.0절 보상 규칙 상수
+    private static final int BASE_COIN = 1000;
+    private static final double BASE_EXP = 25.0;
+    private static final double RESULT_MULTIPLIER_WIN = 1.0;
+    private static final double RESULT_MULTIPLIER_DRAW = 0.8;
+    private static final double RESULT_MULTIPLIER_LOSE = 0.6;
+    private static final int RANK1_BONUS_COIN = 200;
+    private static final double RANK1_BONUS_EXP = 10.0;
+    private static final int RANK2_BONUS_COIN = 100;
+    private static final double RANK2_BONUS_EXP = 5.0;
+    private static final int SOLVED_BONUS_COIN = 100;
+    private static final double SOLVED_BONUS_EXP = 7.5;
 
     /**
      * 게임 결과를 계산하고 GamePlayer 상태를 갱신한다.
-     * 제출 기반 순위 산정 및 차등 보상 적용.
+     * ECONOMY.md 1.0절 보상 규칙을 준수한다.
      */
     private void calculateAndSaveGameResults(UUID gameId) {
         GameStateDto game = gameStateStore.getGame(gameId)
@@ -259,11 +299,12 @@ public class GameService {
             rankCounts.merge(rank, 1, Integer::sum);
         }
 
-        // 2차 패스: 보상 적용
+        // 2차 패스: 보상 적용 (ECONOMY.md 1.0절 보상 규칙)
         for (int i = 0; i < rankedPlayers.size(); i++) {
             PlayerRank pr = rankedPlayers.get(i);
             int currentRank = ranks[i];
             boolean isTied = rankCounts.get(currentRank) > 1;
+            boolean solved = pr.acCount > 0;
 
             // 보상 계산
             int scoreDelta;
@@ -272,33 +313,62 @@ public class GameService {
             String result;
 
             if (isRanked) {
-                // RANKED 모드: 순위별 차등 보상
+                // RANKED 모드: ECONOMY.md 1.0절 보상 규칙
+                // result 결정
                 if (currentRank == 1) {
-                    scoreDelta = 30;
-                    coinDelta = 100;
-                    expDelta = 50.0;
                     result = isTied ? "DRAW" : "WIN";
                 } else if (currentRank == 2) {
-                    scoreDelta = 10;
-                    coinDelta = 50;
-                    expDelta = 30.0;
                     result = isTied ? "DRAW" : "WIN";
                 } else {
-                    scoreDelta = -10;
-                    coinDelta = 20;
-                    expDelta = 20.0;
                     result = isTied ? "DRAW" : "LOSE";
                 }
+
+                // result_multiplier
+                double resultMultiplier = switch (result) {
+                    case "WIN" -> RESULT_MULTIPLIER_WIN;
+                    case "DRAW" -> RESULT_MULTIPLIER_DRAW;
+                    case "LOSE" -> RESULT_MULTIPLIER_LOSE;
+                    default -> RESULT_MULTIPLIER_DRAW;
+                };
+
+                // rank_bonus
+                int rankBonusCoin = 0;
+                double rankBonusExp = 0.0;
+                if (currentRank == 1) {
+                    rankBonusCoin = RANK1_BONUS_COIN;
+                    rankBonusExp = RANK1_BONUS_EXP;
+                } else if (currentRank == 2) {
+                    rankBonusCoin = RANK2_BONUS_COIN;
+                    rankBonusExp = RANK2_BONUS_EXP;
+                }
+
+                // solved_bonus
+                int solvedBonusCoin = solved ? SOLVED_BONUS_COIN : 0;
+                double solvedBonusExp = solved ? SOLVED_BONUS_EXP : 0.0;
+
+                // coin_delta = floor(base_coin * result_multiplier + rank_bonus_coin + solved_bonus_coin)
+                coinDelta = (int) Math.floor(BASE_COIN * resultMultiplier + rankBonusCoin + solvedBonusCoin);
+
+                // exp_delta = base_exp * result_multiplier + rank_bonus_exp + solved_bonus_exp
+                expDelta = BASE_EXP * resultMultiplier + rankBonusExp + solvedBonusExp;
+
+                // scoreDelta: 순위별 점수 변동 (ECONOMY.md에는 명시되지 않았으나 기존 로직 유지)
+                if (currentRank == 1) {
+                    scoreDelta = 30;
+                } else if (currentRank == 2) {
+                    scoreDelta = 10;
+                } else {
+                    scoreDelta = -10;
+                }
             } else {
-                // NORMAL 모드: scoreDelta=0, coinDelta/expDelta 고정
+                // NORMAL 모드: 보상 없음 (ECONOMY.md 1.0절)
                 scoreDelta = 0;
-                coinDelta = 50;
-                expDelta = 30.0;
+                coinDelta = 0;
+                expDelta = 0.0;
                 result = "DRAW";
             }
 
             GamePlayerStateDto player = pr.player;
-            boolean solved = pr.acCount > 0;
 
             GamePlayerStateDto updatedPlayer = new GamePlayerStateDto(
                     player.id(),

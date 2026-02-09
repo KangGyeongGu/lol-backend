@@ -13,6 +13,7 @@ import com.lol.backend.modules.game.service.GameService;
 import com.lol.backend.modules.room.dto.*;
 import com.lol.backend.modules.room.entity.*;
 import com.lol.backend.modules.room.event.RoomEventPublisher;
+import com.lol.backend.modules.game.event.GameEventPublisher;
 import com.lol.backend.modules.user.entity.Language;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
@@ -42,6 +43,7 @@ public class RoomService {
     private final GamePlayerRepository gamePlayerRepository;
     private final UserRepository userRepository;
     private final RoomEventPublisher eventPublisher;
+    private final GameEventPublisher gameEventPublisher;
     private final RoomStateStore roomStateStore;
     private final GameStateStore gameStateStore;
     private final SnapshotWriter snapshotWriter;
@@ -475,10 +477,13 @@ public class RoomService {
         long listVersion = roomStateStore.getListVersion();
         eventPublisher.roomListRemoved(roomId, listVersion, "GAME_STARTED");
 
+        // SSOT 계약: remainingMs와 meta.serverTime을 동일 Instant 기반으로 계산
+        Instant serverTime = Instant.now();
+
         // ROOM_GAME_STARTED 이벤트 발행 → 대기실 클라이언트가 game 토픽 구독 전환
         String pageRoute = ActiveGameResponse.from(updatedGame).pageRoute();
         long remainingMs = (updatedGame.stageDeadlineAt() != null)
-                ? Math.max(0, updatedGame.stageDeadlineAt().toEpochMilli() - Instant.now().toEpochMilli())
+                ? Math.max(0, updatedGame.stageDeadlineAt().toEpochMilli() - serverTime.toEpochMilli())
                 : 0L;
         eventPublisher.roomGameStarted(
                 roomId,
@@ -489,6 +494,19 @@ public class RoomService {
                 updatedGame.stageStartedAt() != null ? updatedGame.stageStartedAt().toString() : null,
                 updatedGame.stageDeadlineAt() != null ? updatedGame.stageDeadlineAt().toString() : null,
                 remainingMs
+        );
+
+        // GAME_STAGE_CHANGED 이벤트 발행 (첫 stage 전이: LOBBY → BAN/PLAY)
+        // SSOT 계약: 모든 stage 전이 시 GAME_STAGE_CHANGED 발행 필요
+        gameEventPublisher.gameStageChanged(
+                game.getId(),
+                roomId,
+                updatedGame.gameType(),
+                updatedGame.stage(),
+                updatedGame.stageStartedAt() != null ? updatedGame.stageStartedAt().toString() : null,
+                updatedGame.stageDeadlineAt() != null ? updatedGame.stageDeadlineAt().toString() : null,
+                remainingMs,
+                serverTime
         );
 
         return ActiveGameResponse.from(updatedGame);
