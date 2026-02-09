@@ -1,8 +1,12 @@
 package com.lol.backend.modules.game.scheduler;
 
+import com.lol.backend.modules.game.entity.Game;
+import com.lol.backend.modules.game.entity.GamePlayer;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.event.GameEventPublisher;
+import com.lol.backend.modules.game.repo.GamePlayerRepository;
+import com.lol.backend.modules.game.repo.GameRepository;
 import com.lol.backend.modules.game.service.GameService;
 import com.lol.backend.modules.user.entity.User;
 import com.lol.backend.modules.user.repo.UserRepository;
@@ -36,6 +40,8 @@ public class GameStageScheduler {
     private final GameService gameService;
     private final GameEventPublisher gameEventPublisher;
     private final UserRepository userRepository;
+    private final GameRepository gameRepository;
+    private final GamePlayerRepository gamePlayerRepository;
 
     /**
      * 1초마다 활성 게임의 stage를 체크하고 자동 전이.
@@ -90,11 +96,15 @@ public class GameStageScheduler {
                         // 6. PLAY stage deadline: 게임 종료
                         if (currentStage == GameStage.PLAY) {
                             log.info("PLAY stage deadline reached, finishing game: gameId={}", gameId);
+
+                            // 이벤트 발행 (flushGame() 전에 발행해야 Redis 데이터 접근 가능)
+                            // SSOT 계약: FINISHED로의 전이도 GAME_STAGE_CHANGED 이벤트 발행 필요
+                            publishGameStageChangedEventForFinished(gameId);
+                            publishGameFinishedEvent(gameId);
+
+                            // 게임 종료 처리 (결과 계산 + DB 반영 + Redis 삭제)
                             gameService.finishGame(gameId);
                             transitionCount++;
-
-                            // GAME_FINISHED 이벤트 발행
-                            publishGameFinishedEvent(gameId);
                         } else {
                             // 7. 기타 stage: 다음 stage로 전이
                             GameStage nextStage = getNextStage(currentStage, gameType);
@@ -186,42 +196,108 @@ public class GameStageScheduler {
     }
 
     /**
+     * GAME_STAGE_CHANGED(FINISHED) 이벤트를 발행한다.
+     * SSOT 계약: 모든 stage 전이 시 GAME_STAGE_CHANGED를 발행해야 함.
+     *
+     * @param gameId 게임 ID
+     */
+    private void publishGameStageChangedEventForFinished(UUID gameId) {
+        try {
+            GameStateDto game = gameStateStore.getGame(gameId).orElse(null);
+            if (game == null) {
+                log.warn("Game not found for GAME_STAGE_CHANGED(FINISHED) event: gameId={}", gameId);
+                return;
+            }
+
+            // FINISHED stage는 deadline이 없으므로 remainingMs=0
+            Instant now = Instant.now();
+            String stageStartedAt = formatInstant(now);
+            String stageDeadlineAt = null;
+            long remainingMs = 0L;
+
+            gameEventPublisher.gameStageChanged(
+                    game.id(),
+                    game.roomId(),
+                    game.gameType(),
+                    GameStage.FINISHED.name(),
+                    stageStartedAt,
+                    stageDeadlineAt,
+                    remainingMs,
+                    now
+            );
+        } catch (Exception e) {
+            log.error("Failed to publish GAME_STAGE_CHANGED(FINISHED) event: gameId={}", gameId, e);
+        }
+    }
+
+    /**
      * GAME_FINISHED 이벤트를 발행한다.
+     * Redis 조회 실패 시 DB fallback으로 이벤트 발행한다.
      *
      * @param gameId 게임 ID
      */
     private void publishGameFinishedEvent(UUID gameId) {
         try {
+            // 1차 시도: Redis에서 조회
             GameStateDto game = gameStateStore.getGame(gameId).orElse(null);
-            if (game == null) {
-                log.warn("Game not found for finished event: gameId={}", gameId);
+            List<GamePlayerStateDto> players = (game != null) ? gameStateStore.getGamePlayers(gameId) : null;
+
+            if (game != null && players != null && !players.isEmpty()) {
+                // Redis 데이터로 이벤트 발행
+                List<GameEventPublisher.GameFinishedResultData> results = players.stream()
+                        .map(gp -> {
+                            User user = userRepository.findById(gp.userId()).orElse(null);
+                            String nickname = (user != null) ? user.getNickname() : "Unknown";
+
+                            return new GameEventPublisher.GameFinishedResultData(
+                                    gp.userId(),
+                                    nickname,
+                                    gp.result() != null ? gp.result() : "DRAW",
+                                    gp.rankInGame() != null ? gp.rankInGame() : 0,
+                                    gp.scoreDelta() != null ? gp.scoreDelta() : 0,
+                                    gp.coinDelta() != null ? gp.coinDelta() : 0,
+                                    gp.expDelta() != null ? gp.expDelta() : 0.0,
+                                    gp.finalScoreValue() != null ? gp.finalScoreValue() : 0,
+                                    gp.solved() != null ? gp.solved() : false
+                            );
+                        })
+                        .toList();
+
+                String finishedAt = formatInstant(game.finishedAt());
+                gameEventPublisher.gameFinished(game.id(), game.roomId(), finishedAt, results);
                 return;
             }
 
-            List<GamePlayerStateDto> players = gameStateStore.getGamePlayers(gameId);
+            // 2차 시도: DB fallback (Redis에서 이미 삭제된 경우)
+            log.warn("Game not found in Redis, falling back to DB: gameId={}", gameId);
+            Game dbGame = gameRepository.findById(gameId).orElse(null);
+            if (dbGame == null) {
+                log.warn("Game not found in DB either: gameId={}", gameId);
+                return;
+            }
 
-            // GamePlayerStateDto → GameFinishedResultData 변환 (닉네임 조회 포함)
-            List<GameEventPublisher.GameFinishedResultData> results = players.stream()
+            List<GamePlayer> dbPlayers = gamePlayerRepository.findByGameId(gameId);
+            List<GameEventPublisher.GameFinishedResultData> results = dbPlayers.stream()
                     .map(gp -> {
-                        User user = userRepository.findById(gp.userId()).orElse(null);
+                        User user = userRepository.findById(gp.getUserId()).orElse(null);
                         String nickname = (user != null) ? user.getNickname() : "Unknown";
 
                         return new GameEventPublisher.GameFinishedResultData(
-                                gp.userId(),
+                                gp.getUserId(),
                                 nickname,
-                                gp.result() != null ? gp.result() : "DRAW",
-                                gp.rankInGame() != null ? gp.rankInGame() : 0,
-                                gp.scoreDelta() != null ? gp.scoreDelta() : 0,
-                                gp.coinDelta() != null ? gp.coinDelta() : 0,
-                                gp.expDelta() != null ? gp.expDelta() : 0.0,
-                                gp.finalScoreValue() != null ? gp.finalScoreValue() : 0,
-                                gp.solved() != null ? gp.solved() : false
+                                gp.getResult() != null ? gp.getResult().name() : "DRAW",
+                                gp.getRankInGame() != null ? gp.getRankInGame() : 0,
+                                gp.getScoreDelta() != null ? gp.getScoreDelta() : 0,
+                                gp.getCoinDelta() != null ? gp.getCoinDelta() : 0,
+                                gp.getExpDelta() != null ? gp.getExpDelta() : 0.0,
+                                gp.getFinalScoreValue() != null ? gp.getFinalScoreValue() : 0,
+                                gp.getSolved() != null ? gp.getSolved() : false
                         );
                     })
                     .toList();
 
-            String finishedAt = formatInstant(game.finishedAt());
-            gameEventPublisher.gameFinished(game.id(), game.roomId(), finishedAt, results);
+            String finishedAt = formatInstant(dbGame.getFinishedAt());
+            gameEventPublisher.gameFinished(dbGame.getId(), dbGame.getRoomId(), finishedAt, results);
         } catch (Exception e) {
             log.error("Failed to publish GAME_FINISHED event: gameId={}", gameId, e);
         }

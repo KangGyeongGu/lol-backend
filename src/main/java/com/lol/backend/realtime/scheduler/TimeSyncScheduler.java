@@ -44,7 +44,8 @@ public class TimeSyncScheduler {
     /**
      * 매초 실행: 연결된 사용자에게 TIME_SYNC 이벤트 발행.
      * - BAN/PICK/SHOP 단계 사용자: 2초 주기
-     * - 그 외: 10초 주기
+     * - 그 외 (LOBBY/PLAY): 10초 주기
+     * - 게임 미참여 또는 종료된 게임의 사용자: 발행 제외
      */
     @Scheduled(fixedRate = 1000)
     public void sendTimeSyncEvents() {
@@ -66,12 +67,20 @@ public class TimeSyncScheduler {
         for (String userId : connectedUserIds) {
             try {
                 // 3.1. 사용자의 현재 게임 stage 조회
-                GameStage currentStage = userStageMap.getOrDefault(userId, null);
+                GameStage currentStage = userStageMap.get(userId);
 
-                // 3.2. stage에 따라 주기 결정
+                // 3.2. 게임에 참여하지 않은 사용자 또는 종료된 게임의 사용자는 제외
+                if (currentStage == null) {
+                    // 게임 미참여 또는 종료된 게임 → TIME_SYNC 발행 제외
+                    // lastSyncTimeMap에서도 제거하여 메모리 정리
+                    lastSyncTimeMap.remove(userId);
+                    continue;
+                }
+
+                // 3.3. stage에 따라 주기 결정
                 long intervalMs = determineInterval(currentStage);
 
-                // 3.3. 마지막 발행 시각 확인
+                // 3.4. 마지막 발행 시각 확인
                 Instant lastSyncTime = lastSyncTimeMap.get(userId);
                 boolean shouldSync = false;
 
@@ -85,7 +94,7 @@ public class TimeSyncScheduler {
                     }
                 }
 
-                // 3.4. TIME_SYNC 이벤트 발행
+                // 3.5. TIME_SYNC 이벤트 발행
                 if (shouldSync) {
                     sendTimeSyncToUser(userId, now);
                     lastSyncTimeMap.put(userId, now);
@@ -153,19 +162,18 @@ public class TimeSyncScheduler {
      * 게임 stage에 따라 TIME_SYNC 주기를 결정한다.
      * SSOT EVENTS.md 2.1 기준:
      * - BAN/PICK/SHOP: 2초
-     * - 그 외 (LOBBY/PLAY/FINISHED/null): 10초
+     * - 그 외 (LOBBY/PLAY): 10초
      *
-     * @param stage 현재 게임 stage (null 가능)
+     * 주의: 이 메서드는 null stage를 받지 않는다.
+     * sendTimeSyncEvents()에서 null stage(게임 미참여/종료) 사용자는 필터링됨.
+     *
+     * @param stage 현재 게임 stage (null이 아님)
      * @return 주기 (ms)
      */
     private long determineInterval(GameStage stage) {
-        if (stage == null) {
-            return 10000L; // 10초
-        }
-
         return switch (stage) {
             case BAN, PICK, SHOP -> 2000L; // 2초
-            default -> 10000L; // 10초 (LOBBY, PLAY, FINISHED)
+            default -> 10000L; // 10초 (LOBBY, PLAY)
         };
     }
 

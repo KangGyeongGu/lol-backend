@@ -5,10 +5,13 @@ import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.modules.game.dto.InventoryResponse;
 import com.lol.backend.modules.game.entity.GameStage;
 import com.lol.backend.modules.game.entity.GameType;
-import com.lol.backend.modules.game.repo.GamePlayerRepository;
-import com.lol.backend.modules.shop.entity.*;
-import com.lol.backend.modules.shop.repo.*;
-import com.lol.backend.modules.shop.service.GameInventoryService;
+import com.lol.backend.modules.catalog.entity.*;
+import com.lol.backend.modules.catalog.repo.*;
+import com.lol.backend.modules.game.entity.ItemUsage;
+import com.lol.backend.modules.game.entity.SpellUsage;
+import com.lol.backend.modules.game.repo.GameSpellPurchaseRepository;
+import com.lol.backend.modules.game.repo.ItemUsageRepository;
+import com.lol.backend.modules.game.repo.SpellUsageRepository;
 import com.lol.backend.realtime.dto.EventType;
 import com.lol.backend.realtime.support.EventPublisher;
 import com.lol.backend.state.store.EphemeralStateStore;
@@ -37,7 +40,6 @@ public class GameEffectService {
     private static final String SPELL_SHIELD = "보호막";
 
     private final GameStateStore gameStateStore;
-    private final GamePlayerRepository gamePlayerRepository;
     private final ItemRepository itemRepository;
     private final SpellRepository spellRepository;
     private final ItemUsageRepository itemUsageRepository;
@@ -68,15 +70,13 @@ public class GameEffectService {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        // 3. 사용자가 게임 참가자인지 확인
-        if (!gamePlayerRepository.existsByGameIdAndUserId(gameId, userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
+        // 3. 사용자가 게임 참가자인지 확인 (write-back 정책 준수: GameStateStore 사용)
+        gameStateStore.getGamePlayer(gameId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
 
         // 4. target이 게임 참가자인지 확인
-        if (!gamePlayerRepository.existsByGameIdAndUserId(gameId, targetUserId)) {
-            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "대상 사용자가 게임 참가자가 아닙니다.");
-        }
+        gameStateStore.getGamePlayer(gameId, targetUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_FAILED, "대상 사용자가 게임 참가자가 아닙니다."));
 
         // 5. Item 조회
         Item item = itemRepository.findById(itemId)
@@ -121,10 +121,9 @@ public class GameEffectService {
             throw new BusinessException(ErrorCode.INVALID_STAGE_ACTION);
         }
 
-        // 3. 사용자가 게임 참가자인지 확인
-        if (!gamePlayerRepository.existsByGameIdAndUserId(gameId, userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
-        }
+        // 3. 사용자가 게임 참가자인지 확인 (write-back 정책 준수: GameStateStore 사용)
+        gameStateStore.getGamePlayer(gameId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
 
         // 4. Spell 조회
         Spell spell = spellRepository.findById(spellId)
