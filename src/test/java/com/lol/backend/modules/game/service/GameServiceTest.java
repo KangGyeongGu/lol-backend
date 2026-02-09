@@ -6,7 +6,7 @@ import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.game.entity.JudgeStatus;
 import com.lol.backend.modules.game.entity.Submission;
 import com.lol.backend.modules.game.repo.SubmissionRepository;
-import com.lol.backend.modules.shop.service.GameInventoryService;
+import com.lol.backend.modules.game.service.GameInventoryService;
 import com.lol.backend.modules.user.entity.Language;
 import com.lol.backend.modules.user.repo.UserRepository;
 import com.lol.backend.state.store.GameStateStore;
@@ -44,6 +44,9 @@ class GameServiceTest {
     private GameStateStore gameStateStore;
 
     @Mock
+    private com.lol.backend.state.store.RoomStateStore roomStateStore;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -54,6 +57,12 @@ class GameServiceTest {
 
     @Mock
     private SubmissionRepository submissionRepository;
+
+    @Mock
+    private com.lol.backend.modules.game.config.GameStageProperties gameStageProperties;
+
+    @Mock
+    private com.lol.backend.modules.room.event.RoomEventPublisher roomEventPublisher;
 
     @InjectMocks
     private GameService gameService;
@@ -92,6 +101,7 @@ class GameServiceTest {
     void finishGame_rankedGame_shouldCalculateRanksAndRewards() {
         // given
         when(gameStateStore.getGame(gameId)).thenReturn(Optional.of(gameStateDto));
+        when(roomStateStore.getRoom(roomId)).thenReturn(Optional.empty());
 
         List<GamePlayerStateDto> players = List.of(
                 createGamePlayer(user1Id, 1000),
@@ -178,6 +188,7 @@ class GameServiceTest {
                 Instant.now()
         );
         when(gameStateStore.getGame(gameId)).thenReturn(Optional.of(normalGame));
+        when(roomStateStore.getRoom(roomId)).thenReturn(Optional.empty());
 
         List<GamePlayerStateDto> players = List.of(
                 createGamePlayer(user1Id, 1000),
@@ -216,6 +227,7 @@ class GameServiceTest {
     void finishGame_tiedPlayers_shouldHaveSameRankAndDraw() {
         // given
         when(gameStateStore.getGame(gameId)).thenReturn(Optional.of(gameStateDto));
+        when(roomStateStore.getRoom(roomId)).thenReturn(Optional.empty());
 
         List<GamePlayerStateDto> players = List.of(
                 createGamePlayer(user1Id, 1000),

@@ -5,7 +5,6 @@ import com.lol.backend.state.store.EphemeralStateStore;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
-import com.lol.backend.state.dto.TypingStatusDto;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * RedisEphemeralStateStore 통합 테스트
- * - TYPING_STATUS, CONNECTION_HEARTBEAT, ITEM_EFFECT_ACTIVE 저장/조회
+ * - CONNECTION_HEARTBEAT, ITEM_EFFECT_ACTIVE 저장/조회
  * - TTL 설정 검증
  * - 효과 제거 검증
  */
@@ -44,70 +43,6 @@ class RedisEphemeralStateStoreTest {
     void tearDown() {
         // 테스트 간 격리를 위해 모든 키 삭제
         redisTemplate.getConnectionFactory().getConnection().serverCommands().flushAll();
-    }
-
-    // ====== TYPING_STATUS 테스트 ======
-
-    @Test
-    void typingStatus_saveAndGet_worksCorrectly() {
-        // Given
-        UUID roomId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        TypingStatusDto typingStatus = new TypingStatusDto(
-                userId,
-                roomId,
-                true,
-                Instant.now()
-        );
-        Duration ttl = Duration.ofSeconds(5);
-
-        // When
-        ephemeralStateStore.saveTypingStatus(typingStatus, ttl);
-        Optional<TypingStatusDto> retrieved = ephemeralStateStore.getTypingStatus(roomId, userId);
-
-        // Then
-        assertThat(retrieved).isPresent();
-        assertThat(retrieved.get().userId()).isEqualTo(userId);
-        assertThat(retrieved.get().roomId()).isEqualTo(roomId);
-        assertThat(retrieved.get().isTyping()).isTrue();
-        assertThat(retrieved.get().updatedAt()).isNotNull();
-    }
-
-    @Test
-    void typingStatus_hasTTL() {
-        // Given
-        UUID roomId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        TypingStatusDto typingStatus = new TypingStatusDto(
-                userId,
-                roomId,
-                true,
-                Instant.now()
-        );
-        Duration ttl = Duration.ofSeconds(5);
-        String key = RedisKeyBuilder.typing(roomId, userId);
-
-        // When
-        ephemeralStateStore.saveTypingStatus(typingStatus, ttl);
-        Long ttlSeconds = redisTemplate.getExpire(key, TimeUnit.SECONDS);
-
-        // Then
-        assertThat(ttlSeconds).isNotNull();
-        assertThat(ttlSeconds).isGreaterThan(0L);
-        assertThat(ttlSeconds).isLessThanOrEqualTo(5L);
-    }
-
-    @Test
-    void typingStatus_notFound_returnsEmpty() {
-        // Given
-        UUID roomId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-
-        // When
-        Optional<TypingStatusDto> retrieved = ephemeralStateStore.getTypingStatus(roomId, userId);
-
-        // Then
-        assertThat(retrieved).isEmpty();
     }
 
     // ====== CONNECTION_HEARTBEAT 테스트 ======

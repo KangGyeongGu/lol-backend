@@ -78,12 +78,6 @@ class RedisKeyBuilderTest {
     }
 
     @Test
-    void typing_returnsCorrectKey() {
-        String key = RedisKeyBuilder.typing(ROOM_ID, USER_ID);
-        assertThat(key).isEqualTo("typing:11111111-1111-1111-1111-111111111111:33333333-3333-3333-3333-333333333333");
-    }
-
-    @Test
     void heartbeat_returnsCorrectKey() {
         String key = RedisKeyBuilder.heartbeat(USER_ID);
         assertThat(key).isEqualTo("heartbeat:33333333-3333-3333-3333-333333333333");
