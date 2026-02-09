@@ -3,7 +3,6 @@ package com.lol.backend.modules.chat.controller;
 import com.lol.backend.common.exception.BusinessException;
 import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.modules.chat.dto.ChatSendCommandData;
-import com.lol.backend.modules.chat.dto.TypingUpdateCommandData;
 import com.lol.backend.modules.chat.service.ChatService;
 import com.lol.backend.realtime.dto.CommandEnvelope;
 import com.lol.backend.realtime.dto.EventEnvelope;
@@ -21,7 +20,7 @@ import java.security.Principal;
 import java.util.Map;
 
 /**
- * 채팅/타이핑 STOMP 핸들러.
+ * 채팅 STOMP 핸들러.
  */
 @Slf4j
 @Controller
@@ -38,18 +37,6 @@ public class ChatStompController {
     public void handleChatSend(CommandEnvelope<ChatSendCommandData> envelope, Principal principal) {
         validatePrincipal(principal);
         chatService.sendChatMessage(principal.getName(), envelope.data());
-    }
-
-    /**
-     * TYPING_UPDATE 커맨드 처리.
-     * Destination: /app/rooms/{roomId}/typing
-     */
-    @MessageMapping("/rooms/{roomId}/typing")
-    public void handleTypingUpdate(@DestinationVariable String roomId,
-                                   CommandEnvelope<TypingUpdateCommandData> envelope,
-                                   Principal principal) {
-        validatePrincipal(principal);
-        chatService.updateTypingStatus(principal.getName(), roomId, envelope.data());
     }
 
     /**

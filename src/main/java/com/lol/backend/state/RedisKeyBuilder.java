@@ -55,10 +55,6 @@ public final class RedisKeyBuilder {
         return "game:" + gameId + ":purchases:spells";
     }
 
-    public static String typing(UUID roomId, UUID userId) {
-        return "typing:" + roomId + ":" + userId;
-    }
-
     public static String heartbeat(UUID userId) {
         return "heartbeat:" + userId;
     }

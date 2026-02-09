@@ -6,7 +6,6 @@ package com.lol.backend.realtime.dto;
  */
 public enum CommandType {
     CHAT_SEND,
-    TYPING_UPDATE,
     ITEM_USE,
     SPELL_USE
 }

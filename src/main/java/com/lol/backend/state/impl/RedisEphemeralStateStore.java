@@ -7,7 +7,6 @@ import com.lol.backend.common.exception.ErrorCode;
 import com.lol.backend.state.RedisKeyBuilder;
 import com.lol.backend.state.dto.ConnectionHeartbeatDto;
 import com.lol.backend.state.dto.ItemEffectActiveDto;
-import com.lol.backend.state.dto.TypingStatusDto;
 import com.lol.backend.state.store.EphemeralStateStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +20,6 @@ import java.util.UUID;
 
 /**
  * Redis 기반 Ephemeral 상태 저장소 구현체.
- * - TYPING_STATUS: Redis String + TTL (~5초)
  * - CONNECTION_HEARTBEAT: Redis String + TTL (~30초)
  * - ITEM_EFFECT_ACTIVE: Redis String + TTL (아이템 지속 시간)
  */
@@ -32,36 +30,6 @@ public class RedisEphemeralStateStore implements EphemeralStateStore {
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper objectMapper;
-
-    @Override
-    public void saveTypingStatus(TypingStatusDto typingStatus, Duration ttl) {
-        String key = RedisKeyBuilder.typing(typingStatus.roomId(), typingStatus.userId());
-        try {
-            String json = objectMapper.writeValueAsString(typingStatus);
-            redisTemplate.opsForValue().set(key, json, ttl);
-            log.debug("Saved typing status: roomId={}, userId={}, isTyping={}, ttl={}s",
-                    typingStatus.roomId(), typingStatus.userId(), typingStatus.isTyping(), ttl.getSeconds());
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize typing status: {}", typingStatus, e);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "타이핑 상태 저장 실패");
-        }
-    }
-
-    @Override
-    public Optional<TypingStatusDto> getTypingStatus(UUID roomId, UUID userId) {
-        String key = RedisKeyBuilder.typing(roomId, userId);
-        String json = redisTemplate.opsForValue().get(key);
-        if (json == null) {
-            return Optional.empty();
-        }
-        try {
-            TypingStatusDto dto = objectMapper.readValue(json, TypingStatusDto.class);
-            return Optional.of(dto);
-        } catch (JsonProcessingException e) {
-            log.error("Failed to deserialize typing status: key={}, json={}", key, json, e);
-            return Optional.empty();
-        }
-    }
 
     @Override
     public void saveHeartbeat(ConnectionHeartbeatDto heartbeat, Duration ttl) {
