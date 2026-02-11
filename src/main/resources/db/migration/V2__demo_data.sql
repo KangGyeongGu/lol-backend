@@ -5,16 +5,16 @@
 -- 1. USERS (10명)
 -- ============================================================
 INSERT INTO users (id, kakao_id, nickname, language, tier, score, exp, coin, active_game_id, created_at, updated_at) VALUES
-('11111111-1111-1111-1111-111111111111', 'demo_kakao_1',  'IronCoder',   'JAVA',       'Iron',         100,  150, 500,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('22222222-2222-2222-2222-222222222222', 'demo_kakao_2',  'BronzeSnake', 'PYTHON',     'Bronze V',     350,  200, 600,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('33333333-3333-3333-3333-333333333333', 'demo_kakao_3',  'SilverNinja', 'CPP',        'Silver III',  1000,  300, 700,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('44444444-4444-4444-4444-444444444444', 'demo_kakao_4',  'GoldScript',  'JAVASCRIPT', 'Gold I',      1700,  400, 800,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('55555555-5555-5555-5555-555555555555', 'demo_kakao_5',  'DiamondAce',  'JAVA',       'Diamond II',  2500,  500, 900,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('66666666-6666-6666-6666-666666666666', 'demo_kakao_6',  'MasterMind',  'PYTHON',     'Master',      2900,  600, 1000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('77777777-7777-7777-7777-777777777777', 'demo_kakao_7',  'PlatinumDev', 'JAVA',       'Platinum III',2100,  450, 750,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('88888888-8888-8888-8888-888888888888', 'demo_kakao_8',  'PyBronze',    'PYTHON',     'Bronze II',    500,  180, 400,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('99999999-9999-9999-9999-999999999999', 'demo_kakao_9',  'CppWarrior',  'CPP',        'Gold III',    1500,  350, 650,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'demo_kakao_10', 'JsRunner',   'JAVASCRIPT', 'Silver I',    1200,  280, 550,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('11111111-1111-1111-1111-111111111111', 'demo_kakao_1',  'IronCoder',   'JAVA',       'Iron',         100,  150.0, 500,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('22222222-2222-2222-2222-222222222222', 'demo_kakao_2',  'BronzeSnake', 'PYTHON',     'Bronze V',     350,  200.0, 600,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('33333333-3333-3333-3333-333333333333', 'demo_kakao_3',  'SilverNinja', 'CPP',        'Silver III',  1000,  300.0, 700,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('44444444-4444-4444-4444-444444444444', 'demo_kakao_4',  'GoldScript',  'JAVASCRIPT', 'Gold I',      1700,  400.0, 800,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('55555555-5555-5555-5555-555555555555', 'demo_kakao_5',  'DiamondAce',  'JAVA',       'Diamond II',  2500,  500.0, 900,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('66666666-6666-6666-6666-666666666666', 'demo_kakao_6',  'MasterMind',  'PYTHON',     'Master',      2900,  600.0, 1000, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('77777777-7777-7777-7777-777777777777', 'demo_kakao_7',  'PlatinumDev', 'JAVA',       'Platinum III',2100,  450.0, 750,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('88888888-8888-8888-8888-888888888888', 'demo_kakao_8',  'PyBronze',    'PYTHON',     'Bronze II',    500,  180.0, 400,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('99999999-9999-9999-9999-999999999999', 'demo_kakao_9',  'CppWarrior',  'CPP',        'Gold III',    1500,  350.0, 650,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'demo_kakao_10', 'JsRunner',   'JAVASCRIPT', 'Silver I',    1200,  280.0, 550,  NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ============================================================
 -- 2. ROOMS (7개: 대기2 + 진행1 + 종료4)
@@ -97,30 +97,30 @@ INSERT INTO game (id, room_id, game_type, stage, stage_started_at, stage_deadlin
 -- 5. GAME_PLAYER
 -- ============================================================
 -- game1 (finished): user2(WIN), user4(LOSE)
-INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
-(gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'LEFT', 350, 370, 20, 100, 1, true, 'WIN', 50, 15.0, CURRENT_TIMESTAMP - INTERVAL '26 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', NULL),
-(gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', '44444444-4444-4444-4444-444444444444', 'LEFT', 1700, 1690, -10, 85, 2, false, 'LOSE', 20, 5.0, CURRENT_TIMESTAMP - INTERVAL '26 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', NULL);
+INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, coin_before, exp_before, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
+(gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', '22222222-2222-2222-2222-222222222222', 'LEFT', 350, 370, 20, 550, 185.0, 100, 1, true, 'WIN', 50, 15.0, CURRENT_TIMESTAMP - INTERVAL '26 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', NULL),
+(gen_random_uuid(), 'cccccccc-cccc-cccc-cccc-cccccccccccc', '44444444-4444-4444-4444-444444444444', 'LEFT', 1700, 1690, -10, 780, 395.0, 85, 2, false, 'LOSE', 20, 5.0, CURRENT_TIMESTAMP - INTERVAL '26 minutes', CURRENT_TIMESTAMP - INTERVAL '10 minutes', NULL);
 
 -- game2 (active): user1, user3, user5
-INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
-(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'CONNECTED', 100, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL),
-(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'CONNECTED', 1000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL),
-(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '55555555-5555-5555-5555-555555555555', 'CONNECTED', 2500, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL);
+INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, coin_before, exp_before, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
+(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '11111111-1111-1111-1111-111111111111', 'CONNECTED', 100, NULL, NULL, 500, 150.0, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL),
+(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '33333333-3333-3333-3333-333333333333', 'CONNECTED', 1000, NULL, NULL, 700, 300.0, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL),
+(gen_random_uuid(), 'dddddddd-dddd-dddd-dddd-dddddddddddd', '55555555-5555-5555-5555-555555555555', 'CONNECTED', 2500, NULL, NULL, 900, 500.0, NULL, NULL, NULL, NULL, NULL, NULL, CURRENT_TIMESTAMP - INTERVAL '8 minutes', NULL, NULL);
 
 -- game3 (finished): user7(WIN), user9(LOSE)
-INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
-(gen_random_uuid(), 'eeee1111-eeee-eeee-eeee-111111111111', '77777777-7777-7777-7777-777777777777', 'LEFT', 2080, 2100, 20, 95, 1, true, 'WIN', 60, 20.0, CURRENT_TIMESTAMP - INTERVAL '2 hours' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '2 hours', NULL),
-(gen_random_uuid(), 'eeee1111-eeee-eeee-eeee-111111111111', '99999999-9999-9999-9999-999999999999', 'LEFT', 1520, 1500, -20, 70, 2, false, 'LOSE', 25, 8.0, CURRENT_TIMESTAMP - INTERVAL '2 hours' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '2 hours', NULL);
+INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, coin_before, exp_before, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
+(gen_random_uuid(), 'eeee1111-eeee-eeee-eeee-111111111111', '77777777-7777-7777-7777-777777777777', 'LEFT', 2080, 2100, 20, 690, 430.0, 95, 1, true, 'WIN', 60, 20.0, CURRENT_TIMESTAMP - INTERVAL '2 hours' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '2 hours', NULL),
+(gen_random_uuid(), 'eeee1111-eeee-eeee-eeee-111111111111', '99999999-9999-9999-9999-999999999999', 'LEFT', 1520, 1500, -20, 625, 342.0, 70, 2, false, 'LOSE', 25, 8.0, CURRENT_TIMESTAMP - INTERVAL '2 hours' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '2 hours', NULL);
 
 -- game4 (finished): user8(WIN), user2(LOSE)
-INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
-(gen_random_uuid(), 'eeee2222-eeee-eeee-eeee-222222222222', '88888888-8888-8888-8888-888888888888', 'LEFT', 480, 500, 20, 90, 1, true, 'WIN', 45, 18.0, CURRENT_TIMESTAMP - INTERVAL '1 hour' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '1 hour', NULL),
-(gen_random_uuid(), 'eeee2222-eeee-eeee-eeee-222222222222', '22222222-2222-2222-2222-222222222222', 'LEFT', 350, 340, -10, 60, 2, false, 'LOSE', 15, 5.0, CURRENT_TIMESTAMP - INTERVAL '1 hour' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '1 hour', NULL);
+INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, coin_before, exp_before, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
+(gen_random_uuid(), 'eeee2222-eeee-eeee-eeee-222222222222', '88888888-8888-8888-8888-888888888888', 'LEFT', 480, 500, 20, 355, 162.0, 90, 1, true, 'WIN', 45, 18.0, CURRENT_TIMESTAMP - INTERVAL '1 hour' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '1 hour', NULL),
+(gen_random_uuid(), 'eeee2222-eeee-eeee-eeee-222222222222', '22222222-2222-2222-2222-222222222222', 'LEFT', 350, 340, -10, 600, 200.0, 60, 2, false, 'LOSE', 15, 5.0, CURRENT_TIMESTAMP - INTERVAL '1 hour' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '1 hour', NULL);
 
 -- game5 (finished): user6(WIN), user4(LOSE)
-INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
-(gen_random_uuid(), 'eeee3333-eeee-eeee-eeee-333333333333', '66666666-6666-6666-6666-666666666666', 'LEFT', 2880, 2900, 20, 100, 1, true, 'WIN', 70, 25.0, CURRENT_TIMESTAMP - INTERVAL '45 minutes' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '45 minutes', NULL),
-(gen_random_uuid(), 'eeee3333-eeee-eeee-eeee-333333333333', '44444444-4444-4444-4444-444444444444', 'LEFT', 1690, 1700, 10, 85, 2, true, 'LOSE', 30, 10.0, CURRENT_TIMESTAMP - INTERVAL '45 minutes' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '45 minutes', NULL);
+INSERT INTO game_player (id, game_id, user_id, state, score_before, score_after, score_delta, coin_before, exp_before, final_score_value, rank_in_game, solved, result, coin_delta, exp_delta, joined_at, left_at, disconnected_at) VALUES
+(gen_random_uuid(), 'eeee3333-eeee-eeee-eeee-333333333333', '66666666-6666-6666-6666-666666666666', 'LEFT', 2880, 2900, 20, 930, 575.0, 100, 1, true, 'WIN', 70, 25.0, CURRENT_TIMESTAMP - INTERVAL '45 minutes' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '45 minutes', NULL),
+(gen_random_uuid(), 'eeee3333-eeee-eeee-eeee-333333333333', '44444444-4444-4444-4444-444444444444', 'LEFT', 1690, 1700, 10, 800, 400.0, 85, 2, true, 'LOSE', 30, 10.0, CURRENT_TIMESTAMP - INTERVAL '45 minutes' - INTERVAL '6 minutes', CURRENT_TIMESTAMP - INTERVAL '45 minutes', NULL);
 
 -- ============================================================
 -- 6. UPDATE users.active_game_id (user1, user3, user5 → game2)
