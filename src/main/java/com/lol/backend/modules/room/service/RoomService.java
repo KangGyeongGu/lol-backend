@@ -67,20 +67,10 @@ public class RoomService {
                 .sorted((r1, r2) -> r2.updatedAt().compareTo(r1.updatedAt()))
                 .collect(Collectors.toList());
 
-        // 페이징 처리 (cursor 기반, 간단 구현)
+        // Filter out rooms with 0 players before pagination
         Instant cursorUpdatedAt = CursorUtils.decode(cursor);
-        List<RoomStateDto> paginated = filteredRooms.stream()
+        List<RoomSummaryResponse> allItems = filteredRooms.stream()
                 .filter(room -> cursorUpdatedAt == null || room.updatedAt().isBefore(cursorUpdatedAt))
-                .limit(limit + 1)
-                .collect(Collectors.toList());
-
-        boolean hasNext = paginated.size() > limit;
-        if (hasNext) {
-            paginated = paginated.subList(0, limit);
-        }
-
-        // RoomSummaryResponse 변환
-        List<RoomSummaryResponse> items = paginated.stream()
                 .map(roomState -> {
                     int currentPlayers = roomStateStore.getPlayers(roomState.id())
                             .stream()
@@ -88,13 +78,13 @@ public class RoomService {
                             .toList()
                             .size();
 
-                    // 플레이어가 0인 방은 제외
+                    // Filter out rooms with 0 players
                     if (currentPlayers == 0) return null;
 
                     boolean hasActiveGame = roomState.activeGameId() != null;
                     boolean isKicked = roomStateStore.isKicked(roomState.id(), currentUserId);
 
-                    String status = hasActiveGame ? "IN_GAME" : "WAITING";
+                    RoomStatus status = hasActiveGame ? RoomStatus.IN_GAME : RoomStatus.WAITING;
                     boolean joinable = !hasActiveGame
                             && !isKicked
                             && currentPlayers < roomState.maxPlayers();
@@ -112,10 +102,15 @@ public class RoomService {
                     );
                 })
                 .filter(r -> r != null)
+                .limit(limit + 1)
                 .collect(Collectors.toList());
 
-        String nextCursor = hasNext && !paginated.isEmpty()
-                ? CursorUtils.encode(paginated.get(paginated.size() - 1).updatedAt())
+        // Pagination
+        boolean hasNext = allItems.size() > limit;
+        List<RoomSummaryResponse> items = hasNext ? allItems.subList(0, limit) : allItems;
+
+        String nextCursor = hasNext && !items.isEmpty()
+                ? CursorUtils.encode(items.get(items.size() - 1).updatedAt())
                 : null;
 
         return new PagedRoomListResponse(
@@ -199,13 +194,8 @@ public class RoomService {
             throw new BusinessException(ErrorCode.KICKED_USER);
         }
 
-        // already in room check
+        // full guard (check before atomic add to avoid unnecessary attempts)
         List<RoomPlayerStateDto> activePlayers = getActivePlayers(roomId);
-        if (activePlayers.stream().anyMatch(p -> p.userId().equals(userId))) {
-            return buildRoomDetailResponse(roomId);
-        }
-
-        // full guard
         if (activePlayers.size() >= roomState.maxPlayers()) {
             throw new BusinessException(ErrorCode.ROOM_FULL);
         }
@@ -215,7 +205,7 @@ public class RoomService {
             throw new BusinessException(ErrorCode.ACTIVE_GAME_EXISTS);
         }
 
-        // Redis에 RoomPlayer 상태 저장 (DB 접근 없음)
+        // Atomic add player (prevents duplicate joins)
         Instant now = Instant.now();
         UUID playerId = UUID.randomUUID();
         RoomPlayerStateDto playerState = new RoomPlayerStateDto(
@@ -227,9 +217,16 @@ public class RoomService {
                 null,
                 null
         );
-        roomStateStore.addPlayer(playerState);
+
+        // Use atomic operation to prevent race condition
+        boolean added = roomStateStore.addPlayerIfNotExists(playerState);
+        if (!added) {
+            // Player already in room, return current state
+            return buildRoomDetailResponse(roomId);
+        }
 
         roomStateStore.incrementListVersion();
+        long listVersion = roomStateStore.getListVersion();
         eventPublisher.playerJoined(
                 roomId,
                 userId,
@@ -237,6 +234,10 @@ public class RoomService {
                 PlayerState.UNREADY.name(),
                 now.toString()
         );
+
+        // Emit ROOM_LIST_UPSERT to synchronize room list after join
+        RoomSummaryResponse summary = buildRoomSummary(roomId);
+        eventPublisher.roomListUpsert(summary, listVersion);
 
         return buildRoomDetailResponse(roomId);
     }
@@ -323,7 +324,12 @@ public class RoomService {
         }
 
         roomStateStore.incrementListVersion();
+        long listVersion = roomStateStore.getListVersion();
         eventPublisher.playerLeft(roomId, userId, Instant.now().toString(), "LEAVE");
+
+        // Emit ROOM_LIST_UPSERT to synchronize room list after leave (if room still exists)
+        RoomSummaryResponse summary = buildRoomSummary(roomId);
+        eventPublisher.roomListUpsert(summary, listVersion);
     }
 
     // ========== 6. ready ==========
@@ -335,8 +341,13 @@ public class RoomService {
             throw new BusinessException(ErrorCode.INVALID_PLAYER_STATE);
         }
 
-        roomStateStore.getPlayer(roomId, userId)
+        RoomPlayerStateDto player = roomStateStore.getPlayer(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
+
+        // Check if player has left the room
+        if (player.leftAt() != null) {
+            throw new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM);
+        }
 
         roomStateStore.updatePlayerState(roomId, userId, PlayerState.READY.name());
 
@@ -359,8 +370,13 @@ public class RoomService {
             throw new BusinessException(ErrorCode.INVALID_PLAYER_STATE);
         }
 
-        roomStateStore.getPlayer(roomId, userId)
+        RoomPlayerStateDto player = roomStateStore.getPlayer(roomId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
+
+        // Check if player has left the room
+        if (player.leftAt() != null) {
+            throw new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM);
+        }
 
         roomStateStore.updatePlayerState(roomId, userId, PlayerState.UNREADY.name());
 
@@ -577,7 +593,7 @@ public class RoomService {
 
         int currentPlayers = getActivePlayers(roomId).size();
         boolean hasActiveGame = roomState.activeGameId() != null;
-        String status = hasActiveGame ? "IN_GAME" : "WAITING";
+        RoomStatus status = hasActiveGame ? RoomStatus.IN_GAME : RoomStatus.WAITING;
         boolean joinable = !hasActiveGame && currentPlayers < roomState.maxPlayers();
 
         return new RoomSummaryResponse(
@@ -599,10 +615,21 @@ public class RoomService {
 
         List<RoomPlayerStateDto> players = getActivePlayers(roomId);
 
+        // Bulk load users to avoid N+1 query
+        List<UUID> userIds = players.stream()
+                .map(RoomPlayerStateDto::userId)
+                .collect(Collectors.toList());
+
+        java.util.Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
         // RoomPlayerResponse 변환
         List<RoomPlayerResponse> playerResponses = players.stream()
                 .map(p -> {
-                    User user = findUserOrThrow(p.userId());
+                    User user = userMap.get(p.userId());
+                    if (user == null) {
+                        throw new BusinessException(ErrorCode.UNAUTHORIZED);
+                    }
                     com.lol.backend.modules.user.dto.UserSummaryResponse userSummary =
                             com.lol.backend.modules.user.dto.UserSummaryResponse.from(user);
                     boolean isHost = p.userId().equals(roomState.hostUserId());

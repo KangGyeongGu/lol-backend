@@ -35,7 +35,7 @@ public class RoomStateStoreImpl implements RoomStateStore {
         String key = RedisKeyBuilder.room(room.id());
         try {
             String json = objectMapper.writeValueAsString(room);
-            redisTemplate.opsForValue().set(key, json);
+            redisTemplate.opsForValue().set(key, json, java.time.Duration.ofHours(24));
             log.debug("Saved room state: roomId={}", room.id());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize room state: " + room.id(), e);
@@ -73,8 +73,31 @@ public class RoomStateStoreImpl implements RoomStateStore {
 
     @Override
     public List<RoomStateDto> getAllActiveRooms() {
-        Set<String> keys = redisTemplate.keys("room:*");
-        if (keys == null || keys.isEmpty()) {
+        // Use SCAN instead of KEYS to prevent blocking in production
+        org.springframework.data.redis.core.ScanOptions options =
+            org.springframework.data.redis.core.ScanOptions.scanOptions()
+                .match("room:*")
+                .count(100)
+                .build();
+
+        Set<String> keys = new HashSet<>();
+        org.springframework.data.redis.core.Cursor<String> cursor = null;
+        try {
+            cursor = redisTemplate.scan(options);
+            while (cursor.hasNext()) {
+                keys.add(cursor.next());
+            }
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    log.warn("Failed to close cursor", e);
+                }
+            }
+        }
+
+        if (keys.isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -103,6 +126,57 @@ public class RoomStateStoreImpl implements RoomStateStore {
             String json = objectMapper.writeValueAsString(player);
             redisTemplate.opsForHash().put(key, hashKey, json);
             log.debug("Added player to room: roomId={}, userId={}", player.roomId(), player.userId());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize room player state: " + player.userId(), e);
+        }
+    }
+
+    /**
+     * Atomically add player to room only if not already present (active player with leftAt == null).
+     * @return true if player was added, false if player already exists
+     */
+    public boolean addPlayerIfNotExists(RoomPlayerStateDto player) {
+        String key = RedisKeyBuilder.roomPlayers(player.roomId());
+        String hashKey = player.userId().toString();
+
+        // Lua script to check if player exists with leftAt == null before adding
+        String luaScript =
+            "local existing = redis.call('HGET', KEYS[1], ARGV[1]) " +
+            "if existing then " +
+            "  local json = cjson.decode(existing) " +
+            "  if not json.leftAt then " +
+            "    return 0 " +
+            "  end " +
+            "end " +
+            "redis.call('HSET', KEYS[1], ARGV[1], ARGV[2]) " +
+            "return 1";
+
+        try {
+            String json = objectMapper.writeValueAsString(player);
+            Long result = redisTemplate.execute(
+                (org.springframework.data.redis.core.RedisCallback<Long>) connection -> {
+                    byte[] keyBytes = key.getBytes();
+                    byte[] hashKeyBytes = hashKey.getBytes();
+                    byte[] jsonBytes = json.getBytes();
+                    Object res = connection.eval(
+                        luaScript.getBytes(),
+                        org.springframework.data.redis.connection.ReturnType.INTEGER,
+                        1,
+                        keyBytes,
+                        hashKeyBytes,
+                        jsonBytes
+                    );
+                    return res != null ? (Long) res : 0L;
+                }
+            );
+
+            boolean added = result != null && result == 1L;
+            if (added) {
+                log.debug("Atomically added player to room: roomId={}, userId={}", player.roomId(), player.userId());
+            } else {
+                log.debug("Player already exists in room: roomId={}, userId={}", player.roomId(), player.userId());
+            }
+            return added;
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize room player state: " + player.userId(), e);
         }
@@ -156,23 +230,46 @@ public class RoomStateStoreImpl implements RoomStateStore {
 
     @Override
     public void updatePlayerState(UUID roomId, UUID userId, String state) {
-        Optional<RoomPlayerStateDto> existing = getPlayer(roomId, userId);
-        if (existing.isEmpty()) {
-            log.warn("Cannot update player state: player not found. roomId={}, userId={}", roomId, userId);
-            return;
-        }
+        String key = RedisKeyBuilder.roomPlayers(roomId);
+        String hashKey = userId.toString();
 
-        RoomPlayerStateDto updated = new RoomPlayerStateDto(
-                existing.get().id(),
-                roomId,
-                userId,
-                state,
-                existing.get().joinedAt(),
-                existing.get().leftAt(),
-                existing.get().disconnectedAt()
-        );
-        addPlayer(updated);
-        log.debug("Updated player state: roomId={}, userId={}, newState={}", roomId, userId, state);
+        // Atomic read-modify-write using Lua script
+        String luaScript =
+            "local existing = redis.call('HGET', KEYS[1], ARGV[1]) " +
+            "if not existing then return nil end " +
+            "local json = cjson.decode(existing) " +
+            "json.state = ARGV[2] " +
+            "local updated = cjson.encode(json) " +
+            "redis.call('HSET', KEYS[1], ARGV[1], updated) " +
+            "return updated";
+
+        try {
+            String result = redisTemplate.execute(
+                (org.springframework.data.redis.core.RedisCallback<String>) connection -> {
+                    byte[] keyBytes = key.getBytes();
+                    byte[] hashKeyBytes = hashKey.getBytes();
+                    byte[] stateBytes = state.getBytes();
+                    Object res = connection.eval(
+                        luaScript.getBytes(),
+                        org.springframework.data.redis.connection.ReturnType.VALUE,
+                        1,
+                        keyBytes,
+                        hashKeyBytes,
+                        stateBytes
+                    );
+                    return res != null ? new String((byte[]) res) : null;
+                }
+            );
+
+            if (result == null) {
+                log.warn("Cannot update player state: player not found. roomId={}, userId={}", roomId, userId);
+            } else {
+                log.debug("Updated player state: roomId={}, userId={}, newState={}", roomId, userId, state);
+            }
+        } catch (Exception e) {
+            log.error("Failed to update player state atomically: roomId={}, userId={}", roomId, userId, e);
+            throw new RuntimeException("Failed to update player state", e);
+        }
     }
 
     @Override

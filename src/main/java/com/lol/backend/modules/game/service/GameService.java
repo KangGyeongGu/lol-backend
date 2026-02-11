@@ -23,8 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 게임 라이프사이클 서비스.
@@ -66,10 +69,19 @@ public class GameService {
         int coin = gameInventoryService.calculateCoin(gameId, userId);
         InventoryResponse inventory = gameInventoryService.calculateInventory(gameId, userId);
 
+        // Bulk load users to avoid N+1 query
+        Set<UUID> userIds = gamePlayers.stream()
+                .map(GamePlayerStateDto::userId)
+                .collect(Collectors.toSet());
+        Map<UUID, User> userMap = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+
         List<GamePlayerResponse> players = gamePlayers.stream()
                 .map(gp -> {
-                    User user = userRepository.findById(gp.userId())
-                            .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR));
+                    User user = userMap.get(gp.userId());
+                    if (user == null) {
+                        throw new BusinessException(ErrorCode.INTERNAL_ERROR);
+                    }
                     return new GamePlayerResponse(
                             user.getId().toString(),
                             user.getNickname(),
@@ -197,21 +209,21 @@ public class GameService {
         // 게임 결과 계산 및 GamePlayer 상태 갱신
         calculateAndSaveGameResults(gameId);
 
-        // 방 삭제 (Redis) 및 ROOM_LIST_REMOVED 이벤트 발행
+        // 방 스냅샷 저장 및 삭제 (DB write-back → Redis deletion)
         // SSOT: 게임 종료 후 방은 목록에서 제거되며, 사용자는 RESULT → MAIN/MY_PAGE로 이동
         UUID roomId = game.roomId();
         Optional<RoomStateDto> roomStateOpt = roomStateStore.getRoom(roomId);
         if (roomStateOpt.isPresent()) {
-            // ROOM_LIST_REMOVED 이벤트 발행 (방 삭제 전에 발행)
-            long listVersion = roomStateStore.getListVersion();
-            roomStateStore.incrementListVersion();
-            roomEventPublisher.roomListRemoved(roomId, listVersion + 1, "ROOM_CLOSED");
+            // Room 스냅샷을 DB에 저장 후 Redis에서 삭제 (flushRoom: persist → delete)
+            snapshotWriter.flushRoom(roomId);
+            log.info("Room snapshot flushed and deleted: roomId={}, gameId={}", roomId, gameId);
 
-            // 방 삭제 (Redis에서 room, players, kicks, hostHistory 모두 제거)
-            roomStateStore.deleteRoom(roomId);
-            log.info("Room deleted after game finish: roomId={}, gameId={}", roomId, gameId);
+            // ROOM_LIST_REMOVED 이벤트 발행 (방 삭제 완료 후 발행)
+            roomStateStore.incrementListVersion();
+            long listVersion = roomStateStore.getListVersion();
+            roomEventPublisher.roomListRemoved(roomId, listVersion, "ROOM_CLOSED");
         } else {
-            log.warn("Room not found when deleting: roomId={}, gameId={}", roomId, gameId);
+            log.warn("Room not found when flushing: roomId={}, gameId={}", roomId, gameId);
         }
 
         // 이벤트 발행은 호출자(스케줄러)에서 처리 (flushGame() 전에 발행해야 Redis 데이터 접근 가능)

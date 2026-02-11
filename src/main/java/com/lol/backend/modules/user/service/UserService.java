@@ -42,13 +42,13 @@ public class UserService {
 
     public UserProfileResponse getMyProfile(String userId) {
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "사용자를 찾을 수 없습니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "사용자 정보를 찾을 수 없습니다"));
         return UserProfileResponse.from(user);
     }
 
     public ActiveGameResponse getMyActiveGame(String userId) {
         User user = userRepository.findById(UUID.fromString(userId))
-                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "사용자를 찾을 수 없습니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INTERNAL_ERROR, "사용자 정보를 찾을 수 없습니다"));
 
         if (user.getActiveGameId() == null) {
             return null;
@@ -63,40 +63,7 @@ public class UserService {
             return null;
         }
 
-        return buildActiveGameResponse(gameState);
-    }
-
-    private ActiveGameResponse buildActiveGameResponse(GameStateDto gameState) {
-        GameStage stage = GameStage.valueOf(gameState.stage());
-        GameType gameType = GameType.valueOf(gameState.gameType());
-        String pageRoute = resolvePageRoute(stage);
-        Integer remainingMs = calculateRemainingMs(gameState);
-
-        return new ActiveGameResponse(
-                gameState.id().toString(),
-                gameState.roomId().toString(),
-                stage,
-                pageRoute,
-                gameType,
-                remainingMs
-        );
-    }
-
-    private String resolvePageRoute(GameStage stage) {
-        return switch (stage) {
-            case LOBBY -> "WAITING_ROOM";
-            case BAN, PICK, SHOP -> "BAN_PICK_SHOP";
-            case PLAY -> "IN_GAME";
-            case FINISHED -> "WAITING_ROOM";
-        };
-    }
-
-    private Integer calculateRemainingMs(GameStateDto gameState) {
-        if (gameState.stageDeadlineAt() == null) {
-            return null;
-        }
-        long remaining = Duration.between(Instant.now(), gameState.stageDeadlineAt()).toMillis();
-        return (int) Math.max(0, remaining);
+        return ActiveGameResponse.from(gameState);
     }
 
     public UserStatsResponse getMyStats(String userId) {
@@ -144,22 +111,40 @@ public class UserService {
             nextCursor = items.get(items.size() - 1).getJoinedAt().toString();
         }
 
+        // N+1 방지: bulk query
+        List<UUID> gameIds = items.stream().map(GamePlayer::getGameId).distinct().toList();
+        var gameMap = gameRepository.findAllById(gameIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Game::getId, g -> g));
+
+        List<UUID> roomIds = gameMap.values().stream()
+                .map(Game::getRoomId)
+                .distinct()
+                .toList();
+        var roomMap = roomRepository.findAllById(roomIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Room::getId, r -> r));
+
+        // finalPlayers bulk query: gameId별 result가 있는 플레이어 수
+        List<GamePlayer> allGamePlayers = gamePlayerRepository.findByGameIdIn(gameIds);
+        var finalPlayersMap = allGamePlayers.stream()
+                .filter(p -> p.getResult() != null)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        GamePlayer::getGameId,
+                        java.util.stream.Collectors.counting()
+                ));
+
         List<MatchSummaryResponse> matches = new ArrayList<>();
         for (GamePlayer gp : items) {
-            Game game = gameRepository.findById(gp.getGameId()).orElse(null);
+            Game game = gameMap.get(gp.getGameId());
             if (game == null) {
                 continue;
             }
 
-            Room room = roomRepository.findById(game.getRoomId()).orElse(null);
+            Room room = roomMap.get(game.getRoomId());
             if (room == null) {
                 continue;
             }
 
-            // finalPlayers: 게임 종료 시점 플레이어 수 (result가 있는 플레이어 수)
-            int finalPlayers = (int) gamePlayerRepository.findByGameId(gp.getGameId()).stream()
-                    .filter(p -> p.getResult() != null)
-                    .count();
+            int finalPlayers = finalPlayersMap.getOrDefault(gp.getGameId(), 0L).intValue();
 
             matches.add(new MatchSummaryResponse(
                     gp.getGameId().toString(),

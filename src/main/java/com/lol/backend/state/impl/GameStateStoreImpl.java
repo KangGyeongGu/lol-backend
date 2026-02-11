@@ -34,7 +34,7 @@ public class GameStateStoreImpl implements GameStateStore {
         String key = RedisKeyBuilder.game(game.id());
         try {
             String json = objectMapper.writeValueAsString(game);
-            redisTemplate.opsForValue().set(key, json);
+            redisTemplate.opsForValue().set(key, json, java.time.Duration.ofHours(4));
             log.debug("Saved game state: gameId={}", game.id());
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize game state: " + game.id(), e);
@@ -128,34 +128,81 @@ public class GameStateStoreImpl implements GameStateStore {
 
     @Override
     public void updateGameStage(UUID gameId, String stage, Instant stageStartedAt, Instant stageDeadlineAt) {
-        Optional<GameStateDto> existing = getGame(gameId);
-        if (existing.isEmpty()) {
-            log.warn("Cannot update game stage: game not found. gameId={}", gameId);
-            return;
-        }
+        String key = RedisKeyBuilder.game(gameId);
 
-        GameStateDto current = existing.get();
-        GameStateDto updated = new GameStateDto(
-                current.id(),
-                current.roomId(),
-                current.gameType(),
-                stage,
-                stageStartedAt,
-                stageDeadlineAt,
-                current.startedAt(),
-                current.finishedAt(),
-                current.finalAlgorithmId(),
-                current.createdAt()
-        );
-        saveGame(updated);
-        log.debug("Updated game stage: gameId={}, newStage={}", gameId, stage);
+        // Atomic read-modify-write using Lua script
+        String luaScript =
+            "local existing = redis.call('GET', KEYS[1]) " +
+            "if not existing then return nil end " +
+            "local json = cjson.decode(existing) " +
+            "json.stage = ARGV[1] " +
+            "json.stageStartedAt = ARGV[2] " +
+            "json.stageDeadlineAt = ARGV[3] " +
+            "local updated = cjson.encode(json) " +
+            "redis.call('SET', KEYS[1], updated, 'KEEPTTL') " +
+            "return updated";
+
+        try {
+            String stageStartedAtStr = stageStartedAt != null ? stageStartedAt.toString() : "";
+            String stageDeadlineAtStr = stageDeadlineAt != null ? stageDeadlineAt.toString() : "";
+
+            String result = redisTemplate.execute(
+                (org.springframework.data.redis.core.RedisCallback<String>) connection -> {
+                    byte[] keyBytes = key.getBytes();
+                    byte[] stageBytes = stage.getBytes();
+                    byte[] startedBytes = stageStartedAtStr.getBytes();
+                    byte[] deadlineBytes = stageDeadlineAtStr.getBytes();
+                    Object res = connection.eval(
+                        luaScript.getBytes(),
+                        org.springframework.data.redis.connection.ReturnType.VALUE,
+                        1,
+                        keyBytes,
+                        stageBytes,
+                        startedBytes,
+                        deadlineBytes
+                    );
+                    return res != null ? new String((byte[]) res) : null;
+                }
+            );
+
+            if (result == null) {
+                log.warn("Cannot update game stage: game not found. gameId={}", gameId);
+            } else {
+                log.debug("Updated game stage: gameId={}, newStage={}", gameId, stage);
+            }
+        } catch (Exception e) {
+            log.error("Failed to update game stage atomically: gameId={}", gameId, e);
+            throw new RuntimeException("Failed to update game stage", e);
+        }
     }
 
     @Override
     public List<UUID> getAllActiveGameIds() {
-        String pattern = "game:*";
-        Set<String> keys = redisTemplate.keys(pattern);
-        if (keys == null || keys.isEmpty()) {
+        // Use SCAN instead of KEYS to prevent blocking in production
+        org.springframework.data.redis.core.ScanOptions options =
+            org.springframework.data.redis.core.ScanOptions.scanOptions()
+                .match("game:*")
+                .count(100)
+                .build();
+
+        Set<String> keys = new HashSet<>();
+        org.springframework.data.redis.core.Cursor<String> cursor = null;
+        try {
+            cursor = redisTemplate.scan(options);
+            while (cursor.hasNext()) {
+                keys.add(cursor.next());
+            }
+        } finally {
+            if (cursor != null) {
+                try {
+                    cursor.close();
+                } catch (Exception e) {
+                    log.warn("Failed to close cursor", e);
+                }
+            }
+        }
+
+        if (keys.isEmpty()) {
             return Collections.emptyList();
         }
 
