@@ -1,10 +1,11 @@
 package com.lol.backend.modules.user.entity;
 
+import com.lol.backend.common.exception.BusinessException;
+import com.lol.backend.common.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -32,19 +33,15 @@ public class User {
     @Column(nullable = false, length = 30)
     private String tier = "Iron";
 
-    @Setter
     @Column(nullable = false)
     private int score = 0;
 
-    @Setter
     @Column(nullable = false)
     private double exp = 0.0;
 
-    @Setter
     @Column(nullable = false)
     private int coin = 1000;
 
-    @Setter
     @Column(name = "active_game_id")
     private UUID activeGameId;
 
@@ -97,5 +94,46 @@ public class User {
         int divisionIndex = ((score - 300) % 500) / 100;
 
         return tierNames[tierIndex] + " " + divisions[divisionIndex];
+    }
+
+    /**
+     * 코인 증감 (음수 방지).
+     */
+    public void addCoin(int delta) {
+        if (this.coin + delta < 0) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_COIN);
+        }
+        this.coin += delta;
+    }
+
+    /**
+     * 경험치 증감 (음수 방지).
+     */
+    public void addExp(double delta) {
+        if (this.exp + delta < 0) {
+            this.exp = 0.0;
+        } else {
+            this.exp += delta;
+        }
+    }
+
+    /**
+     * 점수 증감 (음수 방지) + 티어 자동 갱신.
+     */
+    public void addScore(int delta) {
+        int newScore = this.score + delta;
+        if (newScore < 0) {
+            this.score = 0;
+        } else {
+            this.score = newScore;
+        }
+        this.tier = calculateTier(this.score);
+    }
+
+    /**
+     * 활성 게임 ID 설정/해제.
+     */
+    public void setActiveGameId(UUID gameId) {
+        this.activeGameId = gameId;
     }
 }

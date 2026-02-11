@@ -97,8 +97,11 @@ public class GameBanPickService {
         }
 
         UUID algorithmId = UUID.fromString(request.algorithmId());
-        if (!algorithmRepository.existsById(algorithmId)) {
-            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        var algorithm = algorithmRepository.findById(algorithmId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_FAILED));
+
+        if (!algorithm.isActive()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "사용 불가능한 알고리즘입니다");
         }
 
         // Redis에 밴 저장 (write-back)
@@ -128,8 +131,19 @@ public class GameBanPickService {
         }
 
         UUID algorithmId = UUID.fromString(request.algorithmId());
-        if (!algorithmRepository.existsById(algorithmId)) {
-            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        var algorithm = algorithmRepository.findById(algorithmId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_FAILED));
+
+        if (!algorithm.isActive()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "사용 불가능한 알고리즘입니다");
+        }
+
+        // 밴 체크: 밴된 알고리즘은 선택 불가 (SSOT GAME_RULES.md 4.2)
+        List<GameBanDto> allBans = banPickStateStore.getBans(gameId);
+        boolean isBanned = allBans.stream()
+                .anyMatch(ban -> ban.algorithmId().equals(algorithmId));
+        if (isBanned) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "밴된 알고리즘은 선택할 수 없습니다");
         }
 
         // Redis에 픽 저장 (write-back)

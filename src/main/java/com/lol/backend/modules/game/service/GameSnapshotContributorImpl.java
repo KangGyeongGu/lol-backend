@@ -114,16 +114,17 @@ public class GameSnapshotContributorImpl implements GameSnapshotContributor {
 
                 // score/coin/exp 정산
                 if (playerState.scoreAfter() != null) {
-                    user.setScore(playerState.scoreAfter());
+                    int scoreDelta = playerState.scoreAfter() - user.getScore();
+                    user.addScore(scoreDelta);
                     // Redis Sorted Set 랭킹 갱신
                     rankingStateStore.updateScore(user.getId(), playerState.scoreAfter());
                     log.debug("Updated ranking score in Redis: userId={}, scoreAfter={}", user.getId(), playerState.scoreAfter());
                 }
                 if (playerState.coinDelta() != null) {
-                    user.setCoin(user.getCoin() + playerState.coinDelta());
+                    user.addCoin(playerState.coinDelta());
                 }
                 if (playerState.expDelta() != null) {
-                    user.setExp(user.getExp() + playerState.expDelta());
+                    user.addExp(playerState.expDelta());
                 }
 
                 userRepository.save(user);

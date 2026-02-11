@@ -21,6 +21,8 @@ public interface RoomStateStore {
 
     void addPlayer(RoomPlayerStateDto player);
 
+    boolean addPlayerIfNotExists(RoomPlayerStateDto player);
+
     void removePlayer(UUID roomId, UUID userId);
 
     Optional<RoomPlayerStateDto> getPlayer(UUID roomId, UUID userId);

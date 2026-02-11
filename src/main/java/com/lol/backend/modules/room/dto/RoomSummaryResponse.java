@@ -2,6 +2,7 @@ package com.lol.backend.modules.room.dto;
 
 import com.lol.backend.modules.game.entity.GameType;
 import com.lol.backend.modules.room.entity.Room;
+import com.lol.backend.modules.room.entity.RoomStatus;
 import com.lol.backend.modules.user.entity.Language;
 
 import java.time.Instant;
@@ -14,14 +15,14 @@ public record RoomSummaryResponse(
         Language language,
         int maxPlayers,
         int currentPlayers,
-        String roomStatus,
+        RoomStatus roomStatus,
         boolean joinable,
         Instant updatedAt
 ) {
     public static RoomSummaryResponse from(Room room, int currentPlayers,
                                             boolean hasActiveGame,
                                             boolean isKicked) {
-        String status = hasActiveGame ? "IN_GAME" : "WAITING";
+        RoomStatus status = hasActiveGame ? RoomStatus.IN_GAME : RoomStatus.WAITING;
         boolean joinable = !hasActiveGame
                 && !isKicked
                 && currentPlayers < room.getMaxPlayers();

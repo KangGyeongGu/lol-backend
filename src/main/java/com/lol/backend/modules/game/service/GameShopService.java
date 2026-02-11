@@ -10,6 +10,7 @@ import com.lol.backend.modules.game.dto.ShopSpellRequest;
 import com.lol.backend.modules.game.entity.GameItemPurchase;
 import com.lol.backend.modules.game.entity.GameSpellPurchase;
 import com.lol.backend.modules.game.repo.GameItemPurchaseRepository;
+import com.lol.backend.modules.game.repo.GamePlayerRepository;
 import com.lol.backend.modules.game.repo.GameSpellPurchaseRepository;
 import com.lol.backend.modules.catalog.entity.Item;
 import com.lol.backend.modules.catalog.entity.Spell;
@@ -39,6 +40,7 @@ public class GameShopService {
     private final GameBanPickService gameBanPickService;
     private final GameInventoryService gameInventoryService;
     private final GameEventPublisher gameEventPublisher;
+    private final GamePlayerRepository gamePlayerRepository;
 
     @Transactional
     public GameStateResponse purchaseItem(UUID gameId, UUID userId, ShopItemRequest request) {
@@ -56,9 +58,18 @@ public class GameShopService {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_FAILED));
 
+        if (!item.isActive()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "사용 불가능한 아이템입니다");
+        }
+
         int totalCost = item.getPrice() * request.quantity();
 
-        // 코인 잔액 검증
+        // 동시성 제어: DB 비관적 락을 통한 코인 검증 원자성 보장
+        // GamePlayer 행 락을 획득하여 동일 사용자의 동시 구매 방지
+        gamePlayerRepository.findByGameIdAndUserIdForUpdate(gameId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
+
+        // 코인 잔액 검증 (락 획득 후)
         int currentCoin = gameInventoryService.calculateCoin(gameId, userId);
         if (currentCoin < totalCost) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_COIN);
@@ -98,9 +109,18 @@ public class GameShopService {
         Spell spell = spellRepository.findById(spellId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_FAILED));
 
+        if (!spell.isActive()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED, "사용 불가능한 스펠입니다");
+        }
+
         int totalCost = spell.getPrice() * request.quantity();
 
-        // 코인 잔액 검증
+        // 동시성 제어: DB 비관적 락을 통한 코인 검증 원자성 보장
+        // GamePlayer 행 락을 획득하여 동일 사용자의 동시 구매 방지
+        gamePlayerRepository.findByGameIdAndUserIdForUpdate(gameId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.PLAYER_NOT_IN_ROOM));
+
+        // 코인 잔액 검증 (락 획득 후)
         int currentCoin = gameInventoryService.calculateCoin(gameId, userId);
         if (currentCoin < totalCost) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_COIN);
